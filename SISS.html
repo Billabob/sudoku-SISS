@@ -1,0 +1,2336 @@
+<!doctype html>
+<html>
+<style>
+	#boardWrap {
+		position: relative;
+		width: 676px;
+		height: 676px;
+	}
+	
+	#hintCanvas {
+		position: absolute;
+		top: 0;
+		left: 0;
+		z-index: 3;
+		pointer-events: none;
+		display: block;
+	}
+	
+	#thegrid {
+		position: absolute;
+		top: 20px;
+		left: 20px;
+		width: 636px;
+		height: 636px;
+		z-index: 2;
+		box-sizing: border-box;
+	}
+		
+	.left, .right {
+		top: 0;
+		bottom: 0;
+		width: 5px;
+	}
+
+	.splitright { right: 0; }
+	.splitleft { left: 0; }
+
+	.right { right: 0; }
+	.left { left: 0; }
+	
+	.hide {
+		opacity: 0.1;
+	}
+	.split {
+		height: 100%;
+		width: 50%;
+		position: fixed;
+		z-index: 1;
+		top: 0;
+		overflow-x: hidden;
+		padding-top: 20px;
+		padding-left: 20px;
+	}
+	
+	.centered {
+		text-align: center; 
+		line-height:0.9;
+		color:white;
+	}
+	
+	
+
+	.grid{
+		display:grid;
+		grid-template-columns:repeat(9,70px);
+		grid-template-rows:repeat(9,70px);
+		border:3px solid #000;
+	}
+
+	.cell{
+		position:relative;
+		box-sizing:border-box;
+		width:70px;
+		height:70px;
+		border-right:1px solid #000;
+		border-bottom:1px solid #000;
+		font-weight: bold;
+		background: white;
+		overflow: hidden;
+		color: purple;
+	}
+
+	.digittext{
+		position:absolute;
+		top:50%;
+		left:50%;
+		transform:translate(-50%,-50%);
+		font-size:42px;
+		line-height:1;
+		color:#b000b0;
+	}
+	
+	.digittext.given{
+		color:black;
+	}
+
+	.candidatetext{
+		position:absolute;
+		inset:0;
+		display:grid;
+		grid-template-columns:repeat(3,1fr);
+		grid-template-rows:repeat(3,1fr);
+		font-size:15px;
+		line-height:1;
+		
+		word-wrap:normal;
+		white-space:pre;
+		line-height:1.1em;
+		position:absolute;
+		left:0;
+		right:0;
+		top:0;
+		bottom:0;
+		z-index:4;
+		place-items:end center;
+		/*padding-bottom:3px;*/
+	}
+
+	.candidate{
+		display:flex;
+		align-items:center;
+		justify-content:center;
+		width:100%;
+		height:100%;
+	}
+	
+	.candidate.hidden{
+		visibility:hidden
+	}
+	
+	.candidatetext.hidden{
+		visibility:hidden
+	}
+		
+	.candidate.yellowHL{
+		background:rgba(255,255,0,0.5);
+		border-radius:4px;
+	}
+	
+	.candidate.redHL{
+		background:rgba(255,0,0,0.5);
+		border-radius:4px;
+	}
+	
+	.candidate.greenHL{
+		background:rgba(0,255,0,0.5);
+		border-radius:4px;
+	}
+	
+
+	/* borders */
+	.cell:nth-child(3n):not(:nth-child(9n)){
+		border-right:3px solid #000;
+	}
+	.cell:nth-child(n+19):nth-child(-n+27),
+	.cell:nth-child(n+46):nth-child(-n+54){
+		border-bottom:3px solid #000;
+	}
+	.cell:nth-child(9n){
+		border-right:none;
+	}
+	.cell:nth-child(n+73):nth-child(-n+81){
+		border-bottom:none;
+	}
+</style>
+
+
+
+<body style="background-color:#202020">
+		<div class="split splitleft">
+			<div id="cont" class="centered">
+				<div id="boardWrap">
+					<div id="thegrid" class="grid">
+					</div>
+					<canvas id="hintCanvas" width="676" height="676"></canvas>
+				</div>
+			</div>
+		</div>
+		<div class="split splitright">
+			<div class="centered">
+				<input type="submit" onclick="switchMode('entry')" value="Enter puzzle" id="entrybutton"></input>
+				<!--     <input type="submit" onclick="switchMode('play')" value="Play" id="playbutton"></input>     -->
+				<input type="submit" onclick="switchMode('solver')" value="Solver" id="solverbutton" disabled=true></input>
+				<input type="submit" onclick="switchMode('batch')" value="Batch mode" id="batchmodebutton"></input>
+				<input type="submit" onclick="switchMode('settings')" value="Settings" id="settingsbutton"></input><br><br>
+			</div>
+			<div class="centered" id="entryarea" hidden>
+				<br><br>
+				TODO
+			</div>
+			<div class="centered" id="solverarea">
+				<h5>Enter puzzle import string:<br><input size="45" id="import" value="2163457894...9712..7912...3..24819.77..9532..19.762...9.1.3..7262.5798....7214.9."> 
+				<input type="submit" onclick="importString()" value="Import"></input></h5>
+				<!--<input type="submit" onclick="solver(0)" value="Show candidates"></input><br><br>-->
+				<input type="submit" onclick="solver(1,true)" value="Hint"></input>
+				<input type="submit" onclick="solver(1)" value="Step"></input>
+				<!--<input type="submit" onclick="solver(100)" value="x100"></input>-->
+				<input type="submit" onclick="solver()" value="Solve"></input><br>
+				<h5>Solve log:</h5>
+				<!--<input type="checkbox" id="detailedlogs"><label for="detailedlogs">Detailed logs</label>-->
+				<input type="checkbox" id="autonakedsingles" checked><label for="autonakedsingles">Automatically solve naked singles</label><br>
+				<textarea id="solvelog" name="solvelog" rows="30" cols="50">💸</textarea><br><br>
+			</div>
+			<div class="centered" id="batchrunarea" hidden>
+				<br><br>
+				<!--TODO<br><br>-->
+				<textarea id="batchinput" name="batchinput" rows="5" cols="50">Paste newline-separated list here</textarea>
+				<h5>Or upload file:</h5>
+				<input id="batchinputfile" type="file"/>
+				<h5>Mode: <input size="3" id="batchmodeinput" value="b">
+				<input type="checkbox" id="batchsavetofile"><label for="batchsavetofile">Save output to file</label>
+				<input type="submit" onclick="runBatchFromPage()" value="Run"></input></h5>
+				<h5>Batch output:</h5>
+				<textarea id="batchlog" name="batchlog" rows="25" cols="50">🦇</textarea><br><br>
+			</div>
+			<div class="centered" id="settingsarea" hidden>
+				<br><br>
+				TODO
+			</div>
+		</div>
+
+<script>
+
+	//generic utility functions
+	
+	function deepCopy(obj) {
+	    if(typeof obj !== 'object' || obj === null) {
+	        return obj;
+	    }
+
+	    if(obj instanceof Date) {
+	        return new Date(obj.getTime());
+	    }
+
+	    if(obj instanceof Array) {
+	        return obj.reduce((arr, item, i) => {
+	            arr[i] = deepCopy(item);
+	            return arr;
+	        }, []);
+	    }
+
+	    if(obj instanceof Object) {
+	        return Object.keys(obj).reduce((newObj, key) => {
+	            newObj[key] = deepCopy(obj[key]);
+	            return newObj;
+	        }, {})
+	    }
+	}
+	
+	function sround(x, n=5){
+		//rounds to n sig figs unless it would lose integer precision
+		if(x<10**n){
+			return parseFloat(x.toPrecision(n))
+		}else{
+			return Math.round(x)
+		}
+	}
+			
+	function hammingWeight(n){
+		let count=0
+		while(n){
+			n=n&(n-1)
+			count++
+		}
+		return count
+	}
+	
+	/**
+	 * Copyright 2012 Akseli Palén.
+	 * Created 2012-07-15.
+	 * Licensed under the MIT license.
+	 */
+	function getTuplesFromArray(set,k=2){
+		//for [1,2,3], 2 return [[1,2],[1,3],[2,3]]
+		var i, j, combs, head, tailcombs;
+		if (k > set.length || k <= 0) {
+			return [];
+		}
+		if (k == set.length) {
+			return [set];
+		}
+		if (k == 1) {
+			combs = [];
+			for (i = 0; i < set.length; i++) {
+				combs.push([set[i]]);
+			}
+			return combs;
+		}
+		combs = [];
+		for (i = 0; i < set.length - k + 1; i++) {
+			head = set.slice(i, i+1);
+			tailcombs = getTuplesFromArray(set.slice(i + 1), k - 1);
+			for (j = 0; j < tailcombs.length; j++) {
+				combs.push(head.concat(tailcombs[j]));
+			}
+		}
+		return combs;
+	}
+	
+	function pr(inp){ //make the input array into a comma-separated string
+		return JSON.stringify(inp).replace(/[\[\]"]/g,'').replace(/,/g,', ')
+	}
+	
+	let tupleSizes=["0le","single","pair","triple","quad","quintuple","sextuple","septuple","octuple","nonuple","decuple"] 
+	let fishSizes=["0fish","cyclops","X-Wing","Swordfish","Jellyfish","Starfish","Whale","Leviathan","Octopus","Enneafish","Hammerhead"] //both arrays go up to 10
+
+	//the rest
+	
+	let Grid = {} //grid object which holds all current puzzle data
+	let batchMode = false //is the batch solver currently running (to disable visual updates)
+	let displayboard = true //off for batch mode lol
+	
+	let thegrid = document.getElementById("thegrid")
+	
+	let Options = {
+		//general solver settings
+		autonakedsingles:true,
+		savebatchruntofile:false,
+		//technique toggles
+		Basics:true,
+		BLR:true,
+		Subsets:true,
+		AIC:true,
+		//AIC solver settings
+		SIS:{ //which strong inference sets are permitted
+			Cell:true,
+			Region:true
+		}
+	}
+	
+	let developingmode = true
+	if(developingmode){
+		let stylesheet = document.styleSheets[0]
+		for(let rule of stylesheet.cssRules){
+			if(rule.selectorText==".cell"){
+				rule.style.width="50px"
+				rule.style.height="50px"
+			}
+			if(rule.selectorText==".grid"){
+				rule.style["grid-template-columns"]="repeat(9, 50px)"
+				rule.style["grid-template-rows"]="repeat(9, 50px)"
+			}
+			if(rule.selectorText=="#thegrid"){
+				rule.style.width="456px"
+				rule.style.height="456px"
+			}
+		}
+	}
+	
+	Options.autonakedsingles=true
+	let anscheck=document.getElementById("autonakedsingles")
+	Options.autonakedsingles=anscheck.checked
+	anscheck.addEventListener("change",(event)=>{
+		Options.autonakedsingles=event.currentTarget.checked
+	})
+
+	Options.savebatchruntofile=false
+	let bstfcheck=document.getElementById("batchsavetofile")
+	Options.savebatchruntofile=bstfcheck.checked
+	bstfcheck.addEventListener("change",(event)=>{
+		Options.savebatchruntofile=event.currentTarget.checked
+	})
+
+	function createNewGrid(){
+		let html=""
+		for(let r=1;r<=9;r++){
+			for(let c=1;c<=9;c++){
+				html+=`<div class="cell" id="r${r}c${c}">
+					<span class="digittext"></span>
+					<span class="candidatetext">`
+					for(let i=1;i<=9;i++){
+						html+='<span class="candidate candidate-'+i+'" data-candidate="'+i+'">'+i+'</span>'
+					}
+				html+=`</span>
+				</div>`
+			}
+		}
+		thegrid.innerHTML=html
+	}
+	
+	createNewGrid()
+	
+	let modeSwitches={
+		"solver":[false,true,true,true, true,false,false,false],
+		"batch": [true,false,true,true, false,true,false,false],
+		"entry": [true,true,false,true, false,false,true,false],
+		"settings":  [true,true,true,false, false,false,false,true]
+	}
+	//let stylesheet = document.styleSheets[0]
+	function switchMode(mode){
+		resetHintCanvas()
+		
+		document.getElementById("solverarea").hidden=modeSwitches[mode][0]
+		document.getElementById("batchrunarea").hidden=modeSwitches[mode][1]
+		document.getElementById("entryarea").hidden=modeSwitches[mode][2]
+		document.getElementById("settingsarea").hidden=modeSwitches[mode][3]
+		
+		document.getElementById("solverbutton").disabled=modeSwitches[mode][4]
+		document.getElementById("batchmodebutton").disabled=modeSwitches[mode][5]
+		document.getElementById("entrybutton").disabled=modeSwitches[mode][6]
+		document.getElementById("settingsbutton").disabled=modeSwitches[mode][7]
+	}
+	
+	
+	
+	let blankGrid="notyet" //save a copy of a fresh grid so it doesn't have to be reconstructed every time
+	
+	function initialiseNewGrid(){
+		if(blankGrid!="notyet"){
+			Grid = deepCopy(blankGrid)
+			return
+		}
+		Grid = {}
+		Grid.Cells = {} //indexed by rycx
+		Grid.Rows = []
+		Grid.Columns = []
+		Grid.Boxes = []
+		Grid.Regions = [] //the 3 above, in order
+		Grid.CellList = [] //cell indices
+		
+		for(let i=0;i<9;i++){
+			Grid.Rows[i]=[]
+			Grid.Columns[i]=[]
+			Grid.Boxes[i]=[]
+		}
+		
+		let curxy,curbox
+		for(let y=1;y<=9;y++){
+			for(let x=1;x<=9;x++){
+				curxy="r"+y+"c"+x
+				curbox=Math.floor((y-1)/3)*3 + Math.floor((x-1)/3)+1
+				
+				Grid.Rows[y-1][x-1] = curxy
+				Grid.Columns[y-1][x-1] = "r"+x+"c"+y
+				Grid.CellList[Grid.CellList.length]=curxy
+				
+				Grid.Boxes[curbox-1][Grid.Boxes[curbox-1].length] = curxy
+				let cellPeers = []
+				let cellPeersHT = {}
+				for(let px=1;px<=9;px++){ //r
+					if(px!=x){
+						cellPeers[cellPeers.length]="r"+y+"c"+px
+						cellPeersHT["r"+y+"c"+px]=true
+					}
+				}
+				for(let py=1;py<=9;py++){ //c
+					if(py!=y){
+						cellPeers[cellPeers.length]="r"+py+"c"+x
+						cellPeersHT["r"+py+"c"+x]=true
+					}
+				}
+				let nbx,nby,rx,ry
+				rx=Math.floor((x-1)/3)*3
+				ry=Math.floor((y-1)/3)*3
+				for(let pba=1;pba<=3;pba++){ //b
+					for(let pbb=1;pbb<=3;pbb++){
+						nby=ry+pba
+						nbx=rx+pbb
+						if(nby==y){continue}
+						if(nbx==x){continue}
+						cellPeers[cellPeers.length]="r"+nby+"c"+nbx
+						cellPeersHT["r"+nby+"c"+nbx]=true
+					}
+				}
+				Grid.Cells[curxy]={
+					Position:curxy,					//position of cell
+					Candidates:[1,2,3,4,5,6,7,8,9], //possible candidates in this cell
+					CandidatesHT:{1:true,2:true,
+					3:true,4:true,5:true,6:true,
+					7:true,8:true,9:true},			//hash table for lookups
+					Digit:false,					//placed digit
+					Given:false,					//given digit (for URs and visuals)
+					Peers:cellPeers, 				//all cells seen by this cell
+					PeersHT:cellPeersHT,			//hash table of peers for quickly checking if 2 cells see each other
+					Row:y,							//row of position
+					Column:x,						//col of position
+					Box: curbox						//box of position
+				}
+			}
+			Grid.Regions = [...Grid.Rows]
+			//add cols then boxes to regions
+			for(let i=0;i<9;i++){
+				Grid.Regions[i+9]=[...Grid.Columns[i]]
+			}
+			for(let i=0;i<9;i++){
+				Grid.Regions[i+18]=[...Grid.Boxes[i]]
+			}
+		}
+		
+		
+		blankGrid = deepCopy(Grid)
+	}
+	
+	var solvelog = [] //log of all steps so far
+	var solveLogEl = document.getElementById("solvelog")
+	var importEl = document.getElementById("import")
+	var numLookup = {1:true,2:true,3:true,4:true,5:true,6:true,7:true,8:true,9:true}
+	function importString(str=importEl.value,format="detect"){
+		str=str.trim()
+		initialiseNewGrid()
+		resetHintCanvas()
+		if(format=="detect"){ //try to figure out what format this is
+			if(str.length==81){ //likely a list of givens
+				format="givens"
+			}else{ //pencilmark grid of some kind, write the further analysis later, no need right now
+				if(str.length<81){
+					if(!batchMode){solveLogEl.value = "Invalid import string (too short)"}
+					return false
+				}
+				format="pm" 
+			}
+		}
+		solvelog = [{
+			Difficulty:0,
+			Technique:"Import",
+			Explanation:"Imported puzzle: "+str,
+			Puzzle:str,
+		}]
+		let ansc=Options.autonakedsingles
+		Options.autonakedsingles=false
+		//import
+		if(format=="givens"){
+			let cn,cc
+			for(let i=0;i<81;i++){
+				if(numLookup[str[i]]){
+					setDigit(Grid.Cells[Grid.CellList[i]],Number(str[i]))
+					Grid.Cells[Grid.CellList[i]].Given = true
+				}
+			}
+			if(!batchMode){solveLogEl.value = "Imported puzzle:\n"+str}
+		}
+		solverlock=false
+		Options.autonakedsingles=ansc
+		autosinglesdisabledlastturn=true
+		if(!batchMode){refreshGridDisplay()}
+	}
+	
+	function refreshCellDisplay(cl){
+		let cc = Grid.Cells[cl]
+		let cle = document.getElementById(cl)
+		if(cc.Digit){
+			cle.getElementsByClassName("digittext")[0].innerHTML = cc.Digit
+			cle.getElementsByClassName("candidatetext")[0].classList.add("hidden")
+			if(cc.Given){
+				cle.getElementsByClassName("digittext")[0].classList.add("given")
+			}else{
+				cle.getElementsByClassName("digittext")[0].classList.remove("given")
+			}
+		}else{
+			cle.getElementsByClassName("digittext")[0].innerHTML = ""
+			cle = cle.getElementsByClassName("candidatetext")[0]
+			cle.classList.remove("hidden")
+			for(let n=1;n<=9;n++){
+				if(cc.CandidatesHT[n]){
+					cle.querySelector('.candidate-'+n).classList.remove("hidden")
+				}else{
+					cle.querySelector('.candidate-'+n).classList.add("hidden")
+				}
+			}
+		}
+	}
+	
+	function refreshGridDisplay(){ //completely reset grid visual
+		for(let i=0;i<81;i++){
+			refreshCellDisplay(Grid.CellList[i])
+		}
+	}
+	
+	//batch mode functions
+	
+	function nsStringToArray(str){
+		return str.split(/(?:\n|\r\n?)/);
+	}
+	
+	function runBatchFromPage(){ //just pipe this into existing runBatch function
+		console.log("batch time")
+		let inputgrids
+		//let mode=document.getElementById("batchmodeinput").value
+		//console.log(mode)
+		if(document.getElementById("batchinputfile").files.length>0){ //file uploaded
+			let fr=new FileReader()
+			let file=document.getElementById("batchinputfile").files[0]
+			fr.onload = function(e){
+				//console.log(e)
+				inputgrids=nsStringToArray(e.target.result)
+				//console.log(inputgrids)
+				
+				runBatch(inputgrids,Options.savebatchruntofile)
+			}
+			fr.readAsText(file)
+		}else{ //no file
+			inputgrids=nsStringToArray(document.getElementById("batchinput").value)
+			runBatch(inputgrids,Options.savebatchruntofile)
+		}
+	}
+	
+	function runBatch(inputgrids=testgrids.Easy,/*mode="n",*/logtoFile=false){ //solve all puzzles from the input array
+		//mode unused until i can figure out what to use it for
+		//return
+		batchMode=true
+		displayboard=false
+		let t=Date.now()
+		let logelement=document.getElementById("batchlog")
+		let leiH="Puzzle #	Puzzle String	Success	Max	Total"
+		let dfdsf
+		let curp
+		let batchData = []
+		let shouldLog = inputgrids.length<=500
+		for(let i=0;i<inputgrids.length;i++){
+			curp=inputgrids[i].substring(0,81).replace(/0/g,".")
+			if(curp.length<81){continue}
+			if(shouldLog){console.log(curp)}
+			importString(curp)
+			dfdsf=solver()
+			
+			if(dfdsf){
+				if(shouldLog||i%1000==999){console.log("Puzzle "+i+" has difficulty "+Math.round(dfdsf[0]*1000)/1000)}
+				batchData[batchData.length]={Grid:curp,Success:true,Max:dfdsf[0],Total:dfdsf[1]}
+			}else{
+				if(shouldLog||i%1000==999){console.log("Puzzle "+i+" failed to solve")}
+				batchData[batchData.length]={Grid:curp,Success:false,Max:dfdsf[0],Total:dfdsf[1]}
+			}
+			/*if(logtoFile){
+				if(i%(Math.floor(inputgrids.length/10))==0&&i>0){
+					download(JSON.stringify(batchData),"Batch Run incomplete ("+i+" of "+inputgrids.length+") "+Date.now()+".txt")
+				}
+			}*/
+		}
+		console.log("done :D")
+		console.log("Total time elapsed: "+(Date.now()-t)/1000+" seconds")
+		
+		console.log(batchData)
+		//logelement.innerHTML="Done :D in "+(Date.now()-t)/1000+" seconds"
+		logelement.value="Done :D in "+(Date.now()-t)/1000+" seconds"
+		let bdi
+		for(let i=0;i<batchData.length;i++){
+			bdi=batchData[i]
+			if(bdi.Success){
+				leiH+="\n"+i+"	"+bdi.Grid+"	1	"+Math.round(bdi.Max*1000)/1000+"	"+Math.round(bdi.Total*1000)/1000
+			}else{
+				leiH+="\n"+i+"	"+bdi.Grid+"	0"
+			}
+		}
+		if(logtoFile){
+			download(leiH,"Batch Run "+Date.now()+".txt")
+		}else{
+			//logelement.innerHTML=leiH
+			logelement.value=leiH
+		}
+		batchMode=false
+		displayboard=true
+	}
+	
+	//visual hint functions
+	
+	let hintCanvas = document.getElementById("hintCanvas")
+	let ctx = hintCanvas.getContext("2d")
+	let hintCanvasSize = 636
+	let canvasBorderSize = 20 //need border so the drawn elements don't cut off at the edges
+	
+	function setupHintCanvas(displaySize){
+		let dpr=window.devicePixelRatio||1
+		
+		hintCanvasDisplaySize=displaySize
+		
+		hintCanvas.style.width=`${displaySize}px`
+		hintCanvas.style.height=`${displaySize}px`
+		
+		hintCanvas.width=Math.round(displaySize*dpr)
+		hintCanvas.height=Math.round(displaySize*dpr)
+		
+		ctx.setTransform(dpr,0,0,dpr,0,0)
+		ctx.imageSmoothingEnabled=false
+	}
+	
+	if(developingmode){
+		hintCanvasSize=456 //around here, adjust after
+		document.getElementById("boardWrap").style.width=(hintCanvasSize+40)+"px"
+		document.getElementById("boardWrap").style.height=(hintCanvasSize+40)+"px"
+		setupHintCanvas(hintCanvasSize+40)
+	}else{
+		setupHintCanvas(676)
+	}
+	
+	let chlColours = ["red", "yellow", "green"]
+	function resetHintCanvas(){
+		ctx.clearRect(0,0,hintCanvasDisplaySize,hintCanvasDisplaySize)
+		let hlc
+		for(let i=0;i<chlColours.length;i++){
+			[...document.getElementsByClassName(chlColours[i]+"HL")].forEach(el => {
+				el.classList.remove(chlColours[i]+"HL")
+			})
+		}
+	}
+	
+	function highlightCandidate(cell,candidate,colour="yellow"){
+		document.getElementById(cell).querySelector(".candidate-"+candidate).classList.add(colour+"HL")
+	}
+	
+	function decipherNode(Links,node){ //pass links for grouped premises!
+		let curP = Links.Premises[node]
+		if(curP===undefined){return {Candidates:[],Cells:[]}}
+		let candidates = []
+		let cells=[]
+		for(let i=0;i<curP.Candidates.length;i++){
+			candidates[i] = Links.Premises[curP.Candidates[i]].Digit
+			cells[i] = Links.Premises[curP.Candidates[i]].Position
+		}
+		return {Candidates:candidates,Cells:cells}
+	}
+	
+	function highlightNode(Links,node,colour="yellow"){ //pass links for grouped premises!
+		let n=decipherNode(Links,node)
+		for(let i=0;i<n.Cells.length;i++){
+			highlightCandidate(n.Cells[i],n.Candidates[i],colour)
+		}
+	}
+	
+	function highlightCell(r,c,colour="red",lineThickness=5){
+		highlightGridLine(c,r,"horizontal",colour,lineThickness)
+		highlightGridLine(c,r+1,"horizontal",colour,lineThickness)
+		highlightGridLine(c,r,"vertical",colour,lineThickness)
+		highlightGridLine(c+1,r,"vertical",colour,lineThickness)
+	}
+	
+	function getGridMetrics(){
+		let boardRect=document.getElementById("boardWrap").getBoundingClientRect()
+		let gridRect=thegrid.getBoundingClientRect()
+
+		let rows=[]
+		let cols=[]
+
+		for(let i=1;i<=9;i++){
+			let rowCell=document.getElementById(`r${i}c1`).getBoundingClientRect()
+			rows.push({
+				top:rowCell.top-boardRect.top,
+				bottom:rowCell.bottom-boardRect.top
+			})
+
+			let colCell=document.getElementById(`r1c${i}`).getBoundingClientRect()
+			cols.push({
+				left:colCell.left-boardRect.left,
+				right:colCell.right-boardRect.left
+			})
+		}
+
+		return {
+			left:gridRect.left-boardRect.left,
+			top:gridRect.top-boardRect.top,
+			right:gridRect.right-boardRect.left,
+			bottom:gridRect.bottom-boardRect.top,
+			rows,
+			cols
+		}
+	}
+	
+	function highlightBox(box,colour="red",lineThickness=5){
+		if(box<1||box>9){return}
+		
+		let m=getGridMetrics()
+		
+		let boxRow=Math.floor((box-1)/3)
+		let boxCol=(box-1)%3
+		
+		let startRow=boxRow*3
+		let startCol=boxCol*3
+		let endRow=startRow+2
+		let endCol=startCol+2
+		
+		let left=m.cols[startCol].left
+		let right=m.cols[endCol].right
+		let top=m.rows[startRow].top
+		let bottom=m.rows[endRow].bottom
+		
+		let half=lineThickness/2
+		let width=right-left
+		let height=bottom-top
+		
+		ctx.fillStyle=colour
+		
+		ctx.fillRect(left-half,top-half,width+lineThickness,lineThickness)
+		ctx.fillRect(left-half,bottom-half,width+lineThickness,lineThickness)
+		ctx.fillRect(left-half,top-half,lineThickness,height+lineThickness)
+		ctx.fillRect(right-half,top-half,lineThickness,height+lineThickness)
+	}
+
+	function highlightSlice(dir,colour,start,size=1,lineThickness=5){
+		let m=getGridMetrics()
+
+		let left
+		let top
+		let right
+		let bottom
+		dir=dir.toLowerCase()
+		if(dir==="row"){
+			top=m.rows[start-1].top
+			bottom=m.rows[start+size-2].bottom
+			left=m.cols[0].left
+			right=m.cols[8].right
+		}else if(dir==="col"||dir==="column"){
+			left=m.cols[start-1].left
+			right=m.cols[start+size-2].right
+			top=m.rows[0].top
+			bottom=m.rows[8].bottom
+		}else if(dir==="box"){
+			highlightBox(start,colour,lineThickness)
+			return
+		}else{
+			return
+		}
+
+		ctx.fillStyle=colour
+
+		let half=lineThickness/2
+		let width=right-left
+		let height=bottom-top
+		
+		ctx.fillRect(left-half,top-half,width+lineThickness,lineThickness)
+		ctx.fillRect(left-half,bottom-half,width+lineThickness,lineThickness)
+		ctx.fillRect(left-half,top-half,lineThickness,height+lineThickness)
+		ctx.fillRect(right-half,top-half,lineThickness,height+lineThickness)
+	}
+
+	function highlightGridLine(x,y,dir="horizontal",colour="red",lineThickness=5,transparency=1){
+		let m=getGridMetrics()
+
+		ctx.fillStyle=colour
+		ctx.globalAlpha=transparency
+
+		let half=lineThickness/2
+
+		if(dir==="horizontal"){
+			if(x<0||x>8||y<0||y>9){
+				ctx.globalAlpha=1
+				return
+			}
+
+			let left=m.cols[x].left
+			let right=m.cols[x].right
+			let lineY=(y===0)?m.top:m.rows[y-1].bottom
+
+			ctx.fillRect(left-half,lineY-half,(right-left)+lineThickness,lineThickness)
+		}else{
+			if(x<0||x>9||y<0||y>8){
+				ctx.globalAlpha=1
+				return
+			}
+
+			let top=m.rows[y].top
+			let bottom=m.rows[y].bottom
+			let lineX=(x===0)?m.left:m.cols[x-1].right
+
+			ctx.fillRect(lineX-half,top-half,lineThickness,(bottom-top)+lineThickness)
+		}
+
+		ctx.globalAlpha=1
+	}
+	
+	function getCandidateCoordinates(cell,candidate){ 
+		let parent=document.getElementById("boardWrap")
+		let child=document.getElementById(cell).querySelector(".candidate-"+candidate)
+		
+		let parentRect=parent.getBoundingClientRect()
+		let childRect=child.getBoundingClientRect()
+		
+		let x=(childRect.left+childRect.right)/2-parentRect.left
+		let y=(childRect.top+childRect.bottom)/2-parentRect.top
+		
+		return {X:x,Y:y}
+	}
+	
+	function drawShortenedLine(x1,y1,x2,y2,gap,curve=20){
+		let dx=x2-x1
+		let dy=y2-y1
+		let dist=Math.hypot(dx,dy)
+		if(dist===0){
+			let r=Math.max(gap,8)
+			let gapAngle=Math.PI*0.6
+			
+			let cx=x1-r
+			let cy=y1
+			
+			ctx.beginPath()
+			ctx.arc(cx,cy,r,gapAngle/2,2*Math.PI-gapAngle/2)
+			ctx.stroke()
+			return
+		}
+			
+		let ux=dx/dist
+		let uy=dy/dist
+		
+		// original control point from the full line
+		let mx=(x1+x2)/2
+		let my=(y1+y2)/2
+		
+		let px=-uy
+		let py=ux
+		
+		let cx=mx+px*curve
+		let cy=my+py*curve
+		
+		// tangent at start = control - start
+		let tsx=cx-x1
+		let tsy=cy-y1
+		let tsDist=Math.hypot(tsx,tsy)
+		if(tsDist===0){return}
+		tsx/=tsDist
+		tsy/=tsDist
+		
+		// tangent at end = end - control
+		let tex=x2-cx
+		let tey=y2-cy
+		let teDist=Math.hypot(tex,tey)
+		if(teDist===0){return}
+		tex/=teDist
+		tey/=teDist
+		
+		let newX1=x1+tsx*gap
+		let newY1=y1+tsy*gap
+		let newX2=x2-tex*gap
+		let newY2=y2-tey*gap
+		
+		ctx.beginPath()
+		ctx.moveTo(newX1,newY1)
+		ctx.quadraticCurveTo(cx,cy,newX2,newY2)
+		ctx.stroke()
+	}
+	
+	function drawLineBetweenCandidates(cell1,cand1,cell2,cand2,colour="red"){
+		let coord1 = getCandidateCoordinates(cell1,cand1)
+		let coord2 = getCandidateCoordinates(cell2,cand2)
+		let gap=9		
+		ctx.lineWidth=3
+		ctx.strokeStyle=colour
+		drawShortenedLine(coord1.X,coord1.Y,coord2.X,coord2.Y,gap)
+	}
+	
+	function drawLineBetweenNodes(Links,node1,node2,colour="red"){
+		let n1=decipherNode(Links,node1)
+		let n2=decipherNode(Links,node2)
+		drawLineBetweenCandidates(n1.Cells[0],n1.Candidates[0],n2.Cells[0],n2.Candidates[0],colour)
+	}
+	
+	//end of visual hint functions
+	
+	// solver functions
+	
+	function setDigit(cell,digit="check"){ //cell object please
+		if(digit=="check"){
+			digit=cell.Candidates[0]
+		}
+		cell.Digit = digit
+		cell.Candidates = [digit]
+		cell.CandidatesHT = {}
+		cell.CandidatesHT[digit] = true
+		eliminatePeersOfDigit(cell)
+	}
+	
+	function handleNakedSingle(cell,hintMode=false){
+		//console.log(cell)
+		if(cell.Digit){return false}
+		if(cell.Candidates.length!=1){return false}
+		if(solvelog.length>0&&solvelog[solvelog.length-1].Explanation!="Hidden Single: "+cell.Candidates[0]+" in "+cell.Position){
+			solvelog[solvelog.length] = {
+				Difficulty:0,
+				Technique:"Naked Single",
+				Explanation:"Naked Single: "+cell.Candidates[0]+" in "+cell.Position,
+			}
+		}
+		if(hintMode){
+			highlightCell(cell.Row-1,cell.Column-1,"red")
+			highlightCandidate(cell.Position,cell.Candidates[0],"green")
+		}else{
+			setDigit(cell,cell.Candidates[0])
+		}
+		//console.log("yay")
+		return true
+	}
+	
+	function eliminatePeersOfDigit(cc){ //cell object please
+		let cp
+		if(!cc.Digit){return}
+		for(let i=0;i<cc.Peers.length;i++){
+			cp = Grid.Cells[cc.Peers[i]]
+			if(cp.CandidatesHT[cc.Digit]){
+				delete cp.CandidatesHT[cc.Digit]
+				cp.Candidates = Object.keys(cp.CandidatesHT)
+				if(Options.autonakedsingles){
+					handleNakedSingle(cp)
+				}
+			}
+		}
+	}
+	
+	function checkSolved(){
+		let cc
+		for(let i=0;i<81;i++){ //check all cells have candidates
+			cc = Grid.Cells[Grid.CellList[i]]
+			if(cc.Candidates.length!=1 || !cc.Digit){
+				if(cc.Candidates.length==0){
+					console.log("Uh oh: cell "+Grid.CellList[i]+" has 0 candidates")
+					return "Error"
+				}
+				return false
+			}
+		}
+		//check all digits present in all regions
+		let cr,ds
+		for(let i=0;i<27;i++){
+			ds={}
+			cr=Grid.Regions[i]
+			for(let j=0;j<9;j++){
+				ds[Grid.Cells[cr[j]].Digit] = true
+			}
+			if(Object.keys(ds).length!=9){
+				return "Error"
+			}
+		}
+		return true
+	}
+	
+	//technique functions
+	
+	function nakedSingle(hintMode){
+		let cc
+		for(let i=0;i<81;i++){
+			cc=Grid.Cells[Grid.CellList[i]]
+			if(cc.Digit){continue}
+			if(cc.Candidates.length>1){continue}
+			return {Digits:cc.Candidates[0],Locations:[Grid.CellList[i]],Technique:"Naked Single"}
+			
+			/*if(handleNakedSingle(cc,hintMode)){ //found one
+				//console.log(Grid.CellList[i])
+				if(hintMode){ //display naked single
+					
+				}
+				return {Digits:cc.Candidates[0],Locations:[Grid.CellList[i]],Technique:"Naked Single"}
+			}*/
+		}
+		return false
+	}
+	
+	function hiddenSingle(hintMode){
+		let digitLocs,curreg,curcan,cursli,curind
+		for(let i=0;i<27;i++){ //for every region...
+			curreg=Grid.Regions[i]
+			digitLocs={}
+			for(let j=0;j<9;j++){ //for every cell in that region...
+				curcan=Grid.Cells[curreg[j]].Candidates
+				if(curcan.length==1){continue} //skip over placed digits
+				for(let k=0;k<curcan.length;k++){ //for every candidate in that cell...
+					if(digitLocs[curcan[k]]===undefined){
+						digitLocs[curcan[k]]=curreg[j]
+					}else{
+						digitLocs[curcan[k]]="Bad"
+					}
+				}
+			}
+			for(let j=1;j<=9;j++){
+				if(digitLocs[j]!=undefined&&digitLocs[j]!="Bad"){
+					//console.log("Hidden single: "+j+" in "+digitLocs[j])
+					//console.log(curreg)
+					cursli="row"
+					curind=i+1
+					if(i>=9){cursli="col";curind=curind-9}
+					if(i>=18){cursli="box";curind=curind-9}
+					if(hintMode){
+						highlightSlice(cursli,"red",curind)
+						highlightCandidate(digitLocs[j],j,"green")
+					}
+					return {Digits:[j],Locations:[digitLocs[j]],Technique:"Hidden Single",RegionType:cursli,RegionIndex:curind}
+					//console.log(JSON.stringify(curreg))
+					//console.log(JSON.stringify(digitLocs))
+				}
+			}
+		}
+		return false
+	}
+	
+	//for pointing
+	let miniSectors = [448,56,7,292,146,73] //bitmasks to check against
+	let msRoots =     [  6, 3,0,  2,  1, 0] //index of cell to get row/col from
+	let powersOf2 = {1:true,2:true,4:true,8:true,16:true,32:true,64:true,128:true,256:true,512:true}
+		
+	function boxLineReduction(hintMode){
+		//claiming
+		let digitLocs,curreg,curcan,bHT,curb,elimcells,hilitcells
+		for(let i=0;i<18;i++){ //for every row/col...
+			curreg=Grid.Regions[i]
+			digitLocs={}
+			for(let j=0;j<9;j++){ //for every cell in that region...
+				curcan=Grid.Cells[curreg[j]].Candidates
+				if(curcan.length==1){continue} //skip over placed digits
+				for(let k=0;k<curcan.length;k++){ //for every candidate in that cell...
+					if(digitLocs[curcan[k]]===undefined){
+						digitLocs[curcan[k]]=Grid.Cells[curreg[j]].Box
+					}else{
+						if(digitLocs[curcan[k]]!=Grid.Cells[curreg[j]].Box){
+							digitLocs[curcan[k]]="Bad"
+						}
+					}
+				}
+			}
+			//console.log(digitLocs)
+			for(let j=1;j<=9;j++){
+				if(digitLocs[j]!=undefined&&digitLocs[j]!="Bad"){ //all instances of digit in region are constrained to one box
+					bHT={} //HT of region cells within box
+					for(let k=0;k<9;k++){
+						if(Grid.Cells[curreg[k]].Box==digitLocs[j]){
+							bHT[curreg[k]]=true
+						}
+					}
+					elimcells=[]
+					hilitcells=[]
+					for(let k=0;k<9;k++){ //per cell in box
+						curb=Grid.Boxes[digitLocs[j]-1][k]
+						if(bHT[curb]){ //part of region
+							hilitcells[hilitcells.length]=[curb,j]
+							continue
+						}
+						if(Grid.Cells[curb].CandidatesHT[j]){
+							//elimination
+							elimcells[elimcells.length] = curb
+							curb=Grid.Cells[curb]
+							if(hintMode){
+								highlightCandidate(curb.Position,j,"red")
+							}else{
+								delete curb.CandidatesHT[j]
+								curb.Candidates = Object.keys(curb.CandidatesHT)
+							}
+						}
+					}
+					if(elimcells.length>0){
+						//eliminations found
+						let curr="Row"
+						if(i>=9){curr="Column"}
+						if(hintMode){
+							highlightSlice(curr,"red",i%9+1)
+							highlightBox(digitLocs[j],"blue",7)
+							for(let k=0;k<hilitcells.length;k++){
+								highlightCandidate(hilitcells[k][0],hilitcells[k][1],"green")
+							}
+						}
+						return {Digits:[j],Locations:elimcells,Technique:"Claiming BLR",Box:digitLocs[j],Direction:curr,RegionIndex:i%9}
+					}
+				}
+			}
+		}
+		//pointing
+		let bPs,cc,cDir,cInd,cR,cRc
+		elimcells = []
+		for(let i=0;i<9;i++){ //per box
+			bPs = [0,0,0,0,0,0,0,0,0]
+			for(let j=0;j<9;j++){ //per cell in box
+				cc=Grid.Cells[Grid.Boxes[i][j]]
+				for(let c=0;c<cc.Candidates.length;c++){
+					bPs[cc.Candidates[c]-1] = bPs[cc.Candidates[c]-1] | 2**j
+				}
+			}
+			//console.log(bPs)
+			for(let j=0;j<9;j++){ //per digit check against mask
+				for(let m=0;m<6;m++){ //per mask
+					if(powersOf2[bPs[j]]){continue} //power of 2 = single
+					if((bPs[j]&miniSectors[m]) == bPs[j]){ //pointing
+						cDir = "Row"
+						if(m>2){cDir="Column"}
+						cInd = Grid.Cells[Grid.Boxes[i][msRoots[m]]][cDir]
+						//console.log(i+1,j+1,cDir,cInd)
+						cR = Grid[cDir+"s"][cInd-1]
+						hilitcells=[]
+						for(r=0;r<9;r++){ //for cells in pointing region
+							cRc = Grid.Cells[cR[r]]
+							if((cRc.Box-1)==i){
+								hilitcells[hilitcells.length]=[cRc.Position,j+1]
+								continue
+							}
+							if(cRc.CandidatesHT[j+1]){ //elimination
+								elimcells[elimcells.length] = cRc.Position
+								if(hintMode){
+									highlightCandidate(cRc.Position,j+1,"red")
+								}else{
+									delete cRc.CandidatesHT[j+1]
+									cRc.Candidates = Object.keys(cRc.CandidatesHT)
+									
+								}
+							}
+						}
+						if(elimcells.length>0){
+							//console.log("yay yay hooray")
+							if(hintMode){
+								highlightBox(i+1,"red",5)
+								highlightSlice(cDir,"blue",cInd,1,7)
+								for(let k=0;k<hilitcells.length;k++){
+									highlightCandidate(hilitcells[k][0],hilitcells[k][1],"green")
+								}
+							}
+							return {Digits:[j+1],Locations:elimcells,Technique:"Pointing BLR",Box:(i+1),Direction:cDir,RegionIndex:cInd}
+						}
+					}
+				}
+			}
+		}
+		
+		
+		return false
+	}
+	
+	function nakedHiddenSubsets(hintMode){
+		let digitLocs,curreg,unsolvedDigits,tups,ct,megaOR,cd,ce,curc,elimsreport
+		let powersOf2 = {1:true,2:true,4:true,8:true,16:true,32:true,64:true,128:true,256:true,512:true}
+		let elims = [] //collect all elims and apply smallest one
+		for(let i=0;i<27;i++){ //for every region...
+			curreg=Grid.Regions[i]
+			digitLocs={}
+			digitLocs = [0,0,0,0,0,0,0,0,0]
+			for(let j=0;j<9;j++){ //per cell in region
+				cc=Grid.Cells[curreg[j]]
+				for(let c=0;c<cc.Candidates.length;c++){
+					digitLocs[cc.Candidates[c]-1] = digitLocs[cc.Candidates[c]-1] | 2**j
+				}
+			}
+			unsolvedDigits = []
+			for(let j=0;j<9;j++){
+				if(powersOf2[digitLocs[j]]===undefined){
+					unsolvedDigits[unsolvedDigits.length] = j
+				}
+			}
+			if(unsolvedDigits.length<4){continue} //subset trivialised by naked/hidden single
+			for(let j=2;j<=(unsolvedDigits.length-2);j++){
+				tups = getTuplesFromArray(unsolvedDigits,j)
+				//console.log(tups)
+				for(let t=0;t<tups.length;t++){
+					ct = tups[t]
+					megaOR = digitLocs[ct[0]]
+					for(let c=0;c<ct.length;c++){
+						megaOR = megaOR|digitLocs[ct[c]]
+					}
+					if(hammingWeight(megaOR)==j){
+						//console.log("hammed at "+i)
+						//console.log(ct)
+						cd=0
+						ce=[]
+						for(let d=0;d<9;d++){
+							if(ct[cd]==d){
+								cd++
+								continue
+							}
+							if((digitLocs[d] & megaOR)!=0){
+								//console.log("elimination on "+(d+1)+", "+(digitLocs[d] & megaOR))
+								ce[ce.length] = {Digit:(d+1), Locations:digitLocs[d] & megaOR}
+							}
+						}
+						if(ce.length>0){
+							//console.log(ce)
+							if(unsolvedDigits.length-j<=j){
+								//console.log("naked smaller than hidden")
+								let invtup = []
+								let ultraOR = 0
+								cd=0
+								for(let d=0;d<unsolvedDigits.length;d++){
+									if(ct[cd]==unsolvedDigits[d]){
+										cd++
+										continue
+									}
+									ultraOR = ultraOR|digitLocs[unsolvedDigits[d]]
+									invtup[invtup.length]=unsolvedDigits[d]
+								}
+								elims[elims.length] = {
+									elimlocs:[...ce],
+									i:i,
+									unsolvedDigits:[...unsolvedDigits],
+									megaOR:ultraOR^megaOR,
+									tup:invtup,
+									size:unsolvedDigits.length-j,
+									type:"Naked"
+								}
+							}else{
+								elims[elims.length] = {
+									elimlocs:[...ce],
+									i:i,
+									unsolvedDigits:[...unsolvedDigits],
+									megaOR:megaOR,
+									tup:[...ct],
+									size:j,
+									type:"Hidden"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		//console.log(elims)
+		if(elims.length>0){ //subsets found, so grab the smallest
+			let smallest
+			let smallestsize=9
+			for(let i=0;i<elims.length;i++){
+				if(elims[i].size<smallestsize){
+					smallest=elims[i]
+					smallestsize=elims[i].size
+					if(smallestsize==2){break}
+				}
+			}
+			//console.log(smallest)
+			let dir="Row"
+			if(smallest.i>8){dir="Column"}
+			if(smallest.i>17){dir="Box"}
+			let ind=smallest.i%9+1
+			curreg=Grid.Regions[smallest.i]
+			elimsreport=[]
+			elimcells = {}
+			for(let i=0;i<smallest.elimlocs.length;i++){
+				for(let p=0;p<9;p++){
+					if(smallest.elimlocs[i].Locations & (2**p)){
+						curc=Grid.Cells[curreg[p]]
+						if(hintMode){ //display
+							highlightCandidate(curreg[p],smallest.elimlocs[i].Digit,"red")
+						}else{
+							delete curc.CandidatesHT[smallest.elimlocs[i].Digit]
+							curc.Candidates = Object.keys(curc.CandidatesHT)
+						}
+						elimsreport[elimsreport.length] = [curreg[p],smallest.elimlocs[i].Digit]
+						elimcells[curreg[p]]=true
+					}
+				}
+			}
+			elimcells=Object.keys(elimcells)
+			//console.log(elimsreport)
+			let elimstring = ""
+			let elimsreport2 = {}
+			let di=0
+			if(smallest.type=="Naked"){di=1}
+			for(i=0;i<elimsreport.length;i++){
+				if(elimsreport2[elimsreport[i][di]]===undefined){elimsreport2[elimsreport[i][di]]=[]}
+				elimsreport2[elimsreport[i][di]][elimsreport2[elimsreport[i][di]].length] = elimsreport[i][1-di]
+			}
+			//console.log(elimsreport2)
+			if(hintMode){
+				if(smallest.type=="Naked"){
+					highlightSlice(dir,"blue",ind)
+				}else{
+					highlightSlice(dir,"red",ind)
+				}
+				for(let p=0;p<9;p++){
+					if(smallest.megaOR & (2**p)){
+						for(let c=0;c<smallest.tup.length;c++){
+							highlightCandidate(curreg[p],smallest.tup[c]+1,"green")
+						}
+					}
+				}
+			}
+			return {
+				Digits:smallest.tup,
+				Locations:elimcells,
+				Eliminations:elimsreport2,
+				Technique:smallest.type,
+				Size:smallest.size,
+				Direction:dir,
+				RegionIndex:ind
+			}
+		}
+	}
+	
+	//-------------- strong inference set based AIC solver --------------
+	
+	//runs on the concept of strong inference sets, sets of premises where at least 1 element must be true
+	//any division of a strong inference set into 2 subsets where all elements of the set are contained within at least one of the subset proves
+	//that there is a weak inference between the 2 subsets, i.e. at least one of the elements contained within one of them must be true
+	//these strong inference sets can be grouped by mutual weak inferences and fed into the generalised AIC solver
+	//the AIC solver iteratively applies the formula A = B - C = D => A = D until no new strong inferences are proven
+	//if no eliminations are found from all possible AIC, the newly proven strong inferences can be 
+	//used to prove new weak inferences for endpoint nodes via the formula A - B = C - D => A - D
+	//this gives us new divisions of the strong inference sets and the process repeats until all possible deductions are made, at which point
+	//the technique set (the definitions for strong inference sets) is proven insufficient to solve the current puzzle
+	//it is likely this solver will NOT be able to solve every puzzle as this process has an uncertain ceiling and 9.4 SEs are already hard to solve with almost-AIC
+	//at least without defining further strong inference sets like exocet base combinations
+	
+	//using the term "link" for inferences here because IDC i don't want to type that every time!!!
+	
+	function addPremiseIfNew(Links,candidates,WLs,type){ 
+		//candidates is array of the individual candidate premises that comprise the group, WLs is array of all weakly linked premises
+		//WLs should have proof (whether basic or aic) and type included
+		let premise=candidates
+		if(typeof(candidates)=="object"){
+			premise = tokeniseGroup(candidates)
+		}
+		//console.log(candidates)
+		//console.log(WLs)
+		//console.log(type)
+		if(Links.Premises[premise]===undefined){ //new premise
+			Links.Premises[premise] = {
+				Candidates:candidates,
+				StrongLinks:[],
+				StrongPremises:{},
+				Type:type,
+				WLHT:{},
+				WLs:WLs
+			}
+			let cwlp
+			for(let i=0;i<WLs.length;i++){
+				Links.Premises[premise].WLHT[WLs[i].Premise]=i
+				//add to WLs[i] premise too
+				//console.log(WLs[i])
+				cwlp=Links.Premises[WLs[i].Premise]
+				if(cwlp.WLHT[premise]===undefined){
+					//console.log(candidates)
+					//console.log(WLs)
+					//console.log(type)
+					cwlp.WLHT[premise]=cwlp.WLs.length
+					cwlp.WLs[cwlp.WLs.length]={
+						Premise:premise,
+						Proof:WLs[i].Proof,
+						ProofSize:WLs[i].ProofSize,
+						Type:WLs[i].Type
+					}
+				}
+			}
+		}else{ //existing premise, add to weak inferences if applicable
+			for(let i=0;i<WLs.length;i++){
+				if(Links.Premises[premise].WLHT[WLs[i].Premise]===undefined){
+					Links.Premises[premise].WLHT[WLs[i].Premise]=i
+					Links.Premises[premise].WLs[Links.Premises[premise].WLs.length] = WLs[i]
+				}
+			}
+		}
+	}
+	
+	function addStrongLink(Links,premiseA,premiseB,type,len=1,innerWL,unionorigin){
+		//make sure nodes actually exist first
+		if(typeof(premiseA)=="object"){
+			premiseA = tokeniseGroup(premiseA)
+		}
+		if(typeof(premiseB)=="object"){
+			premiseB = tokeniseGroup(premiseB)
+		}
+		if(Links.Premises[premiseA]===undefined||Links.Premises[premiseB]===undefined){
+			//console.log(Links)
+			//console.log(premiseA)
+			//console.log(premiseB)
+			throw new Error("uh oh premise doesn't exist")
+			return false
+		}
+		
+		let curo=Links.SLs.length
+		//check if these 2 candidates/groups are already linked by something else first
+		let sP = Links.Premises[premiseA].StrongPremises[premiseB]
+		if(sP!==undefined){
+			if(Links.SLs[sP[0]].Length>len){ //this new strong link is shorter than the existing one, so replace it
+				curo = sP[0]
+				//preserve parity!
+				if(sP[1]=="B"){
+					let ta=premiseA
+					premiseA=premiseB
+					premiseB=ta
+				}
+			}else{
+				return false
+			}
+		}else{
+			Links.Premises[premiseA].StrongLinks[Links.Premises[premiseA].StrongLinks.length]=[curo,"A"]
+			Links.Premises[premiseB].StrongLinks[Links.Premises[premiseB].StrongLinks.length]=[curo,"B"]
+			Links.Premises[premiseA].StrongPremises[premiseB]=[curo,"A"]
+			Links.Premises[premiseB].StrongPremises[premiseA]=[curo,"B"]
+		}
+		Links.SLs[curo] = {
+			"Type":type,
+			"A":premiseA,
+			"B":premiseB,
+			"Length":len
+		}
+		if(innerWL!==undefined&&type!="Union"){
+			Links.SLs[curo].InnerWL=innerWL
+		}
+		if(unionorigin!==undefined){
+			Links.SLs[curo].UnionOrigin=unionorigin
+		}
+		return curo
+	}
+	
+	function tokeniseGroup(group){ //group is array of candidates like ["1r1c1","1r1c2"] etc
+		group.sort()
+		let outp=group[0]
+		for(let i=1;i<group.length;i++){
+			outp+="|"+group[i]
+		}
+		return outp
+	}
+	
+	let regionEnum = ["Row","Column","Box"]
+	let regionCheckEnum = ["Rows","Columns","Boxes"]
+	function collectCandidatePremises(){ //all grouped premises will be composed of these candidate premises
+		let curc,peers,peersHT,regpeers,curreg
+		let Premises = {}
+		for(let i=0;i<Grid.CellList.length;i++){
+			curc=Grid.Cells[Grid.CellList[i]]
+			if(curc.Digit){continue}
+			for(let c=0;c<curc.Candidates.length;c++){
+				peers=[...curc.Candidates] //cellwise peers
+				peersHT={}
+				peers.splice(c,1)
+				for(let p=0;p<peers.length;p++){
+					peers[p] = {Premise:peers[p]+curc.Position,Proof:-1,ProofSize:0,Type:"Cell"} //Proof = -1 means no aic involved in proof i.e. it is primitive
+					peersHT[peers[p].Premise]=p
+				}
+				/*for(let p=0;p<curc.Peers.length;p++){
+					if(Grid.Cells[curc.Peers[p]].CandidatesHT[curc.Candidates[c]]){
+						peers[peers.length] = {Premise:curc.Candidates[c]+curc.Peers[p],Proof:-1,Type:"local"
+					}
+				}*/
+				//have to go through row col box individually for these in order to differentiate them
+				regpeers = {}
+				regpeers[curc.Position]=true
+				for(let r=0;r<3;r++){
+					curreg=Grid[regionCheckEnum[r]][curc[regionEnum[r]]-1]
+					for(let p=0;p<9;p++){
+						if(regpeers[curreg[p]]){continue}
+						if(Grid.Cells[curreg[p]].CandidatesHT[curc.Candidates[c]]===undefined){continue}
+						regpeers[curreg[p]]=true
+						peers[peers.length] = {Premise:curc.Candidates[c]+curreg[p],Proof:-1,ProofSize:0,Type:regionEnum[r]}
+						peersHT[curc.Candidates[c]+curreg[p]]=peers.length-1
+					}
+				}
+				Premises[curc.Candidates[c]+curc.Position] = {
+					Type:"Candidate",
+					Digit:curc.Candidates[c],
+					Position:curc.Position,
+					Candidates:[curc.Candidates[c]+curc.Position],
+					WLs:[...peers],
+					WLHT:{...peersHT},
+					StrongLinks: [], //strong links containing this as a premise
+					StrongPremises: {} //strongly linked premises
+				}
+			}
+		}
+		return Premises
+	}
+	
+	function divideSIS(Links){ //subdivide all strong inference sets
+		let csis,groups,g1,g2,p1,p2,wl1,wl2,wl3,gp1,gp2,gp1t,gp2t,wlp1,wlp2
+		for(let i=0;i<Links.SIS.length;i++){ //per SIS
+			csis = Links.SIS[i]
+			//set up premisesHT
+			if(csis.PremisesHT===undefined){
+				csis.PremisesHT={}
+				for(let p=0;p<csis.Premises.length;p++){
+					csis.PremisesHT[csis.Premises[p]]=0
+				}
+				csis.PremisesHT[csis.Premises[0]]=1
+			}
+			p1 = Links.Premises[csis.Premises[0]]
+			for(let w=0;w<p1.WLs.length;w++){ //go through WLs of first premise & build groups for each one
+				wl1=p1.WLs[w]
+				//if(csis.PremisesHT[wl1.Premise]!==undefined){continue} //WL is within the strong inference set so skip
+				p2=""
+				groups={...csis.PremisesHT}
+				g1 = [0]
+				g2 = []
+				for(let p=1;p<csis.Premises.length;p++){ //build group 1 based on WL
+					if(Links.Premises[csis.Premises[p]].WLHT[wl1.Premise]){ //premise has that WL
+						groups[csis.Premises[p]]=1
+						g1[g1.length]=p
+					}else{ //remainder go in group 2
+						groups[csis.Premises[p]]=2
+						g2[g2.length]=p
+						if(p2!=""){continue} //mark first element of group 2
+						p2=Links.Premises[csis.Premises[p]]
+					}
+				}
+				
+				if(g1.length==csis.Premises.length){ //group 1 already contains the entire strong inference set, split it down the middle
+					g1 = [0]
+					g2 = []
+					p2 = ""
+					groups = {...csis.PremisesHT}
+					for(let p=1;p<csis.Premises.length;p++){
+						if(p<(csis.Premises.length/2)){ //g1
+							groups[csis.Premises[p]]=1
+							g1[g1.length]=p
+						}else{ //g2
+							groups[csis.Premises[p]]=2
+							g2[g2.length]=p
+							if(p2!=""){continue} //mark first element of group 2
+							p2=Links.Premises[csis.Premises[p]]
+						}
+					}
+				}
+				
+				if(p2!=""){ //if group 2 exists find common weak inferences
+					wl2=[]
+					for(let x=0;x<p2.WLs.length;x++){
+				//		if(csis.PremisesHT[p2.WLs[x].Premise]!==undefined){continue} //WL is within the strong inference set so skip
+						wl2[wl2.length]=p2.WLs[x]//.Premise
+					}
+					for(let x=1;x<g2.length;x++){
+						for(let v=0;v<wl2.length;v++){
+							if(Links.Premises[csis.Premises[g2[x]]].WLHT[wl2[v].Premise]===undefined){ //wl not represented in a node in group 2
+								wl2.splice(v,1)
+								v--
+							}
+						}
+						if(wl2.length==0){break}
+					}
+					if(wl2.length==0){continue}
+					//console.log(wl2)
+				}
+				
+				wl3=[]
+				for(let x=0;x<p1.WLs.length;x++){ //find all mutual weak inferences of group 1 (rather than just the initial one)
+				//	if(csis.PremisesHT[p1.WLs[x].Premise]!==undefined){continue} //WL is within the strong inference set so skip
+					wl3[wl3.length]=p1.WLs[x]//.Premise
+				}
+				for(let x=1;x<g1.length;x++){
+					for(let v=0;v<wl3.length;v++){
+						if(Links.Premises[csis.Premises[g1[x]]].WLHT[wl3[v].Premise]===undefined){ //wl not represented in a node in group 1
+							wl3.splice(v,1)
+							v--
+						}
+					}
+					if(wl3.length==1){break}
+				}
+
+				if(csis.Premises.length>0 && wl2.length==0){continue} //2nd grouping exists, but no weak inferences
+				
+				
+				gp1=[]
+				gp2=[]
+				for(let x=0;x<g1.length;x++){
+					gp1[x]=csis.Premises[g1[x]]
+				}
+				for(let x=0;x<g2.length;x++){
+					gp2[x]=csis.Premises[g2[x]]
+				}
+				gp1t=tokeniseGroup(gp1)
+				gp2t=tokeniseGroup(gp2)
+				
+				//check if any weak inferences are internal only, i.e. only with the other group
+				wlp1=[]
+				wlp2=[]
+				for(let x=0;x<wl3.length;x++){
+					wlp1[x]=wl3[x].Premise
+				}
+				for(let x=0;x<wl2.length;x++){
+					wlp2[x]=wl2[x].Premise
+				}
+				//console.log(wlp1)
+				//console.log(wlp2)
+				if(tokeniseGroup(wlp1)==gp2t){continue}
+				if(tokeniseGroup(wlp2)==gp1t){continue}
+				
+				if(csis.Premises.length==1){ //only 1 premise
+					addPremiseIfNew(Links,gp1,wl3,csis.Type)
+					addStrongLink(Links,
+						csis.Premises[0],
+						csis.Premises[0],
+						csis.Type,
+						1) //this is the length, it needs to be 1 + the sum of the weak inference proofs soon
+						
+				}else{ //more than 1 premise, new strong inference
+					addPremiseIfNew(Links,gp1,wl3,csis.Type)
+					addPremiseIfNew(Links,gp2,wl2,csis.Type)
+					addStrongLink(Links,
+						gp1,
+						gp2,
+						csis.Type,
+						1) //this is the length, it needs to be 1 + the sum of the weak inference proofs soon
+				}
+				
+				
+				
+				/*console.log(csis)
+				console.log(wl1)
+				console.log(wl2)
+				console.log(wl3)
+				console.log(groups)
+				console.log(g1)
+				console.log(gp1)
+				console.log(g2)
+				console.log(gp2)
+				return*/
+			}
+		}
+	}
+	
+	function groupedWLs(Links){
+		let pk=Object.keys(Links.Premises)
+		let pa,pb,agrouped,prb,peers
+		//let aHT,overlap //potentially unneeded
+		for(let a=0;a<pk.length-1;a++){
+			pa=Links.Premises[pk[a]]
+			agrouped=pa.Candidates.length>1
+			/*aHT={}
+			for(let i=0;i<pa.Candidates.length;i++){
+				aHT[pa.Candidates[i]]=true
+			}*/
+			for(let b=a+1;b<pk.length;b++){
+				//if(pk[b]!="3r4c1|3r4c2"){continue}
+				pb=Links.Premises[pk[b]]
+				if(!agrouped && (pb.Candidates.length==1)){continue} //grouped-grouped or grouped-single only please
+				//console.log(pa.WLHT)
+				//console.log(pk[a],pk[b])
+				if(pa.WLHT[pk[b]]!==undefined){continue} //already weakly linked
+				//console.log("passed")
+				//is there an overlap (candidate contained within both sets)
+				/*overlap=false
+				for(let i=0;i<pb.Candidates.length;i++){
+					if(aHT[pb.Candidates[i]]){
+						overlap=true
+						break
+					}
+				}
+				if(overlap){continue}*/
+				peers=true
+				//do all candidates in B see all candidates in A; vice versa is implicit; overlap is implicit too?
+				for(let i=0;i<pb.Candidates.length;i++){
+					prb=Links.Premises[pb.Candidates[i]]
+					for(let j=0;j<pa.Candidates.length;j++){
+						if(prb.WLHT[pa.Candidates[j]]===undefined){
+							peers=false
+							break
+						}
+					}
+					if(!peers){break}
+				}
+				if(!peers){continue}
+				if(!batchMode){console.log(pk[a],pk[b])}
+				//add each premise as a weak link to the other now
+				//proofs should be combined here for complex groups!!!
+				pa.WLs[pa.WLs.length] = {
+					Premise: pk[b],
+					Proof: -1,    //TEMPORARY
+					ProofSize: 0, //TEMPORARY
+					Type:"Grouped Peers"
+				}
+				pb.WLs[pb.WLs.length] = {
+					Premise: pk[a],
+					Proof: -1,    //TEMPORARY
+					ProofSize: 0, //TEMPORARY
+					Type:"Grouped Peers"
+				}
+				pa.WLHT[pk[b]]=pa.WLs.length-1
+				pb.WLHT[pk[a]]=pb.WLs.length-1
+			}
+		}
+	}
+	
+	function checkSLForElims(Links,SL){ //SL is index for convenience, peers are generalised to weak inferences
+		let sli=Links.SLs[SL]
+		let pa=Links.Premises[sli.A]
+		let pb=Links.Premises[sli.B]
+		let elims=[]
+		for(let i=0;i<pa.WLs.length;i++){
+			if(pb.WLHT[pa.WLs[i].Premise]!==undefined){ //mutual weak inference
+				if(pa.WLs[i].Proof!=-1){continue} //not a peer, but instead an AIC-derived weak inference, perhaps this can be enabled as an option
+				if(Links.Premises[pa.WLs[i].Premise].Candidates.length>1){continue} //grouped premise, so skip...
+				//console.log("waooooow")
+				//console.log(pa.WLs[i])
+				//handle later
+				elims[elims.length]=pa.WLs[i].Premise
+			}
+		}
+		if(elims.length>0){
+			return elims
+		}else{
+			return false
+		}
+	}
+	
+	let nodeEnum=["A","B"]
+	let flipNode={"A":"B","B":"A"}
+	function combineAllSLs(Links,prevLength){
+		let newSLs = {SLs:[],Premises:{}}
+		let curSL,curP,curWL,curWLP,curCD,curCDparity,newSLID,newA,newB,curo,newSize
+		//console.log(Links.SLs.length)
+		for(let i=prevLength;i<Links.SLs.length;i++){ // A=B
+			curSL = Links.SLs[i]
+			for(let parity=0;parity<=1;parity++){ //whether to extend from A or B
+				curP=Links.Premises[curSL[nodeEnum[parity]]]
+				for(let wl=0;wl<curP.WLs.length;wl++){ //per weakly linked premise; A=B-C
+					curWL=curP.WLs[wl]
+					curWLP=Links.Premises[curWL.Premise]
+					for(let sl=0;sl<curWLP.StrongLinks.length;sl++){ //A=B-C=D => A=D
+						if(curWLP.StrongLinks[sl][0]==i){continue} //skip same SL
+						curCD = Links.SLs[curWLP.StrongLinks[sl][0]]
+						curCDparity = curWLP.StrongLinks[sl][1]
+						newA=curSL[nodeEnum[1-parity]]
+						newB=curCD[flipNode[curCDparity]]
+						/*if(Links.SLs.length==103){
+							console.log(curSL)
+							console.log(curP)
+							console.log(curWL)
+							console.log(curWLP)
+							console.log(curCD)
+							console.log(curCDparity)
+							console.log("A:",newA,"B:",newB)
+						}*/
+						//console.log(curCD)
+						//console.log(curCDparity)
+						curo = newSLs.SLs.length
+						if(curWLP.StrongPremises[newA]){continue} //already an SL, consider replacing if shorter, likely to be possible on higher depths
+						newSize = curSL.Length + curWL.ProofSize + curCD.Length
+						if(newSLs.Premises[newA]!==undefined){
+							if(newSLs.Premises[newA][newB]!==undefined){
+								if(newSLs.Premises[newA][newB][1] > newSize){ //shorter than existing newSL
+									curo = newSLs.Premises[newA][newB][0]
+								}else{
+									continue
+								}
+							}
+						}
+						newSLs.SLs[curo] = [
+							newA,
+							newB,
+							newSize,
+							[i,  //1st SL ID
+							 curWLP.StrongLinks[sl][0], //2nd SL ID
+							 nodeEnum[1-parity], //1st SL parity
+							 flipNode[curCDparity], //2nd SL parity
+							 curWL.Type, 
+							 curWL.Proof, 
+							 curWL.ProofSize] //innerWL
+							
+						]
+						if(newSLs.Premises[newA]===undefined){newSLs.Premises[newA]={}}
+						if(newSLs.Premises[newB]===undefined){newSLs.Premises[newB]={}}
+						newSLs.Premises[newA][newB] = [curo, newSize]
+						newSLs.Premises[newB][newA] = [curo, newSize]
+						//return newSLs
+					}
+					//return newSLs
+				}
+				//return newSLs
+			}
+		}
+		return newSLs
+	}
+	
+	function buildAllChains(Links){ //iteratively apply A=B-C=D => A=D until no more new inferences are proven
+		let newSLs,curSL,cce
+		let prevLength = 0
+		for(let i=0;i<100;i++){
+			newSLs = combineAllSLs(Links,prevLength) //modify Links in place, newSLs is array of modified/new indices
+			//console.log(Links.SLs.length)
+			prevLength = Links.SLs.length
+			if(newSLs.SLs.length==0){return false}
+			newSLs.SLs.sort((a, b) => a[2] - b[2])
+			//console.log(newSLs)
+			for(let j=0;j<newSLs.SLs.length;j++){
+				addStrongLink(Links,newSLs.SLs[j][0],newSLs.SLs[j][1],"AIC",newSLs.SLs[j][2],newSLs.SLs[j][3])
+				cce = checkSLForElims(Links,Links.SLs.length-1)
+				if(cce){return {Elims:cce,SL:Links.SLs.length-1}}
+			}
+		}
+		return false
+	}
+	
+	
+	let weakLinkAlias = {
+		"Row":"r",
+		"Column":"c",
+		"Box":"b",
+		"Cellwise":"n"
+	}
+	let linkTypeAlias = {
+		"Row": "R",
+		"Column": "C",
+		"Box": "B",
+		"Cell": "N"
+	}
+	let nodeFlipEnum={"A":0,"B":1}
+	let nodeFlipLookup=["B","A"]
+	function unwrapChain(Links,chain,flip=0){ //converts a strong link into a full AIC, chain = object not index
+		//console.log(chain)
+		//console.log(flip)
+		let outp={CS:"",Structure:"",Grouped:false,UnwrappedChainSL:[],UnwrappedChainWL:[]}
+		if(chain.Type=="AIC"){
+			//console.log(chain.InnerWL)
+			//console.log(Links.Strong[chain.InnerWL[0]])
+			//console.log(Links.Strong[chain.InnerWL[1]])
+			//return chainToString(Links,Links.StrongLinks
+			
+			let ls=unwrapChain(Links, Links.SLs[chain.InnerWL[flip]], nodeFlipEnum[chain.InnerWL[2+flip]])
+			let rs=unwrapChain(Links, Links.SLs[chain.InnerWL[1-flip]], nodeFlipEnum[flipNode[chain.InnerWL[3-flip]]])
+			
+			outp.CS = ls.CS+" - "/*+chain.InnerWL[4]+"- "*/+rs.CS
+			//let wlt=chain.InnerWL[2].match(/[a-z]/)?.[0].toLowerCase()
+			let wlt = weakLinkAlias[chain.InnerWL[4]]
+			//ok, for the weak region classes r = region not row, n = cell, b = box (cage) combinations
+			outp.Structure=ls.Structure+wlt+rs.Structure
+			outp.Grouped=ls.Grouped||rs.Grouped
+			outp.UnwrappedChainSL = ls.UnwrappedChainSL.concat(rs.UnwrappedChainSL)
+			outp.UnwrappedChainWL = ls.UnwrappedChainWL
+			outp.UnwrappedChainWL[outp.UnwrappedChainWL.length] = chain.InnerWL
+			outp.UnwrappedChainWL = outp.UnwrappedChainWL.concat(rs.UnwrappedChainWL)
+		}else{
+			let ls = chain[nodeFlipLookup[1-flip]]
+			let rs = chain[nodeFlipLookup[flip]]
+			let ct = chain.Type
+			outp.UnwrappedChainSL = [{SL:{...chain},Flip:flip,UnionOrigin:{}}]
+			//handle union (equivalence)
+			/*if(chain.Type=="Union"){
+				if(chain.UnionOrigin[nodeFlipLookup[1-flip]]!==undefined){
+					ls = "(" + ls + "+" + Links.Strong[chain.UnionOrigin[nodeFlipLookup[1-flip]]][nodeFlipLookup[1-flip]] + ")"
+					outp.UnwrappedChainSL[0].UnionOrigin[nodeFlipLookup[1-flip]] = {...Links.Strong[chain.UnionOrigin[nodeFlipLookup[1-flip]]]}
+				}
+				if(chain.UnionOrigin[nodeFlipLookup[flip]]!==undefined){
+					rs = "(" + Links.Strong[chain.UnionOrigin[nodeFlipLookup[flip]]][nodeFlipLookup[flip]] + "+" + rs + ")"
+					outp.UnwrappedChainSL[0].UnionOrigin[nodeFlipLookup[flip]] = {...Links.Strong[chain.UnionOrigin[nodeFlipLookup[flip]]]}
+				}
+				ct = chain.UnionOrigin.Type
+				if(chain.UnionOrigin.Type=="Grouped"){outp.Grouped=true}
+			}*/
+			outp.CS = ls + "=" + rs
+			outp.Structure = linkTypeAlias[ct]
+			if(Links.Premises[ls].Candidates.length>1 || Links.Premises[rs].Candidates.length>1){outp.Grouped=true}
+		}
+		return outp
+	}
+	
+	function drawUnwrappedChain(Links,chain){
+		let curSL,curWL
+		for(let i=0;i<chain.UnwrappedChainSL.length;i++){
+			curSL = chain.UnwrappedChainSL[i]
+			
+			highlightNode(Links,curSL.SL[nodeEnum[curSL.Flip]],"green")
+			highlightNode(Links,curSL.SL[nodeEnum[1-curSL.Flip]],"yellow")
+			
+			drawLineBetweenNodes(Links,curSL.SL.A,curSL.SL.B,"red")
+		}
+		for(let i=0;i<chain.UnwrappedChainWL.length;i++){
+			curWL = chain.UnwrappedChainWL[i]
+			drawLineBetweenNodes(
+				Links,
+				chain.UnwrappedChainSL[i].SL[nodeEnum[1-chain.UnwrappedChainSL[i].Flip]],
+				chain.UnwrappedChainSL[i+1].SL[nodeEnum[chain.UnwrappedChainSL[i+1].Flip]],
+				//chain.UnwrappedChainSL[i+1].SL[flipNode[curWL[3]]],
+				"blue"
+			)
+		}
+	}
+	
+	//strong inference set definitions
+	
+	function cellSIS(Links){
+		let curc,sisl
+		for(let i=0;i<Grid.CellList.length;i++){
+			curc=Grid.Cells[Grid.CellList[i]]
+			if(curc.Digit){continue}
+			sisl=Links.SIS.length
+			Links.SIS[sisl] = {
+				Type:"Cell",
+				Location:Grid.CellList[i],
+				Premises:[],
+				Extras:[], //for eliminations in rings, irrelevant for cellwise
+				SLs:[] //put the subdivision data here later
+			}
+			for(let c=0;c<curc.Candidates.length;c++){
+				Links.SIS[sisl].Premises[Links.SIS[sisl].Premises.length] = curc.Candidates[c]+curc.Position
+			}
+		}
+	}
+	
+	function regionSIS(Links){
+		let curreg,locs
+		let cdir = "Row"
+		for(let i=0;i<Grid.Regions.length;i++){ //per region
+			curreg=Grid.Regions[i]
+			if(i==9){cdir="Column"}
+			if(i==18){cdir="Box"}
+			for(let d=1;d<=9;d++){ //per digit
+				locs=[]
+				for(let c=0;c<9;c++){ //per cell in region
+					if(Grid.Cells[curreg[c]].CandidatesHT[d]){
+						locs[locs.length] = d+curreg[c]
+					}
+				}
+				if(locs.length==1){continue}
+				Links.SIS[Links.SIS.length] = {
+					Type:cdir,
+					Digit:d,
+					Location:(i%9)+1,
+					Premises:[...locs],
+					Extras:[], //for eliminations in rings, irrelevant for regional
+					SLs:[] //put the subdivision data here later
+				}
+			}
+		}
+	}
+	
+	let profiling=true
+	
+	function AICSolver(hintMode){
+		let Links = {Premises:{},SLs:[],SIS:[]}
+		let bac,cce,sortedSLs
+		let t=Date.now()
+		//collect all candidate premises first
+		Links.Premises = collectCandidatePremises()
+		if(profiling&&!batchMode){console.log("collected candidate premises",Date.now()-t);t=Date.now()}
+		//identify strong inference sets
+		if(Options.SIS.Cell){cellSIS(Links)}
+		if(Options.SIS.Region){regionSIS(Links)}
+		if(profiling&&!batchMode){console.log("collected SIS",Date.now()-t);t=Date.now()}
+		
+		
+		//identify all divisions through common weak inferences
+		divideSIS(Links)
+		if(profiling&&!batchMode){console.log("divided SIS",Date.now()-t);t=Date.now()}
+		//identify weak inferences between new linked nodes
+		groupedWLs(Links)
+		if(profiling&&!batchMode){console.log("grouped WLs",Date.now()-t);t=Date.now()}
+		//build all possible AIC
+		bac = buildAllChains(Links)
+		if(profiling&&!batchMode){console.log("built all AIC",Date.now()-t);t=Date.now()}
+		if(!batchMode){console.log(Links)}
+		if(bac){
+			cce=bac.Elims
+			if(!batchMode){console.log(bac)}
+			let elimSL=Links.SLs[bac.SL]
+			let uw=unwrapChain(Links,elimSL)
+			//console.log("woaw",bac.SL)
+			//console.log(elimSL)
+			//console.log(cce)
+			let AICString=""
+			if(batchMode){
+				AICString="AIC"
+			}else{
+				//construct aic string for solver
+				AICString=uw.CS+" => "
+			}
+			let elims = []
+			let elimcells = []
+			for(let e=0;e<cce.length;e++){
+				elims[e] = [Links.Premises[cce[e]].Digit,Links.Premises[cce[e]].Position]
+				elimcells[e] = Links.Premises[cce[e]].Position
+				if(!batchMode){
+					if(e>0){AICString+=", "}
+					AICString+=elims[e][1]+"<>"+elims[e][0]
+				}
+				if(hintMode){
+					highlightCandidate(elims[e][1],elims[e][0],"red")
+				}else{
+					delete Grid.Cells[elims[e][1]].CandidatesHT[elims[e][0]]
+					Grid.Cells[elims[e][1]].Candidates = Object.keys(Grid.Cells[elims[e][1]].CandidatesHT)
+				}
+			}
+			if(hintMode){ //display chain
+				//console.log(elimSL)
+				//console.log(uw)
+				drawUnwrappedChain(Links,uw)
+			}
+			return {
+				Technique:"AIC", //named chain if applicable
+				chainString:AICString,
+				chainLength:elimSL.Length,
+				Depth:1, //almost-x depth
+				Locations:elimcells
+			}
+		}
+		//no eliminations found from all possible chains
+		
+		
+		
+		return false
+	}
+	
+	//end of AIC solver
+	
+	
+	//order of techniques
+	
+	function basicsSolver(hintMode){
+		if(!Options.autonakedsingles){
+			let nS = nakedSingle(hintMode)
+			if(nS){
+				//found naked single
+				//console.log("naked single")
+				return nS
+			}
+		}
+		let hS = hiddenSingle(hintMode)
+		if(hS){
+			//found hidden single
+			//console.log("hidden single")
+			solvelog[solvelog.length] = {
+				Explanation:"Hidden Single: "+hS.Digits[0]+" in "+hS.Locations[0],
+				Difficulty:0}
+				//Time:Date.now()-t}
+			let hscell=Grid.Cells[hS.Locations[0]]
+			let dig=hS.Digits[0]
+			if(hintMode){
+		//		highlightSlice(hS.RegionType,"red",hS.RegionIndex)
+		//		highlightCandidate(hS.Locations[0],hS.Digits[0],"green")
+			}else{
+				hscell.Candidates=[dig]
+				hscell.CandidatesHT={}
+				hscell.CandidatesHT[dig]=true
+			}
+			return hS
+		}
+		if(Options.BLR){
+			let blr = boxLineReduction(hintMode)
+			if(blr){
+				//blr
+				if(blr.Technique=="Claiming BLR"){
+					let exp="Claiming candidates: Box "+blr.Box+" must contain "+blr.Digits[0]+" in "+blr.Direction+" "+(blr.RegionIndex+1)+"; "+pr(blr.Locations)+"<>"+blr.Digits[0]
+					
+					solvelog[solvelog.length]={
+						Explanation:exp,
+						Difficulty:0.001}
+						//Time:Date.now()-t}
+				}else{ //pointing
+					solvelog[solvelog.length]={
+						Explanation:"Pointing candidates: "+blr.Direction+" "+blr.RegionIndex+" must contain "+blr.Digits[0]+" in Box "+blr.Box+"; "+pr(blr.Locations)+"<>"+blr.Digits[0],
+						Difficulty:0.001}
+						//Time:Date.now()-t}
+						
+				}
+				return blr
+			}
+		}
+		if(Options.Subsets){
+			let ss = nakedHiddenSubsets(hintMode)
+			if(ss){
+				//console.log("WOAW")
+				//console.log(ss)
+				let elimstring = "{"
+				for(let i=0;i<ss.Digits.length;i++){
+					elimstring+=(ss.Digits[i]+1)
+				}
+				elimstring+= "} "+ss.Technique+" "+tupleSizes[ss.Size]+" in "+ss.Direction+" "+ss.RegionIndex+": "
+				let elkies=Object.keys(ss.Eliminations)
+				if(ss.Technique=="Hidden"){
+				    for(let i=0;i<elkies.length;i++){
+					    if(i>0){elimstring+=", "}
+					    elimstring+=elkies[i]+"<>"+pr(ss.Eliminations[elkies[i]])
+				    }
+				}else{ //naked
+					 for(let i=0;i<elkies.length;i++){
+					    if(i>0){elimstring+=", "}
+					    elimstring+=pr(ss.Eliminations[elkies[i]])+"<>"+elkies[i]
+				    }
+				}
+				solvelog[solvelog.length] = {
+					Explanation: elimstring,
+					Difficulty:ss.Size/1000
+				}
+				return ss
+			}
+		}
+	}
+	
+	function hierarchicalSolver(hintMode){
+		if(Options.Basics){
+			let basics = basicsSolver(hintMode)
+			//console.log(basics)
+			if(basics){
+				//basics steps found
+				//console.log("basics")
+				return basics
+			}
+		}
+		if(Options.AIC){
+			let aict
+			if(!batchMode){console.log("=== AIC started ===")
+			aict=Date.now()}
+			let aic=AICSolver(hintMode)
+			if(!batchMode){console.log("=== AIC ended ===\nTime taken: "+(Date.now()-aict)+"ms")
+			console.log(aic)}
+			if(aic){ //eureka string is already built within the function so should be painless
+				solvelog[solvelog.length] = {Explanation: aic.Technique+": "+aic.chainString,
+					Difficulty:aic.Depth + Math.min(999,aic.chainLength)/1000}
+					//Time:Date.now()-t}
+				return aic
+			}
+		}
+	}
+	
+	
+	let solverlock = false
+	let autosinglesdisabledlastturn = false
+	
+	function solver(n=729,hintMode=false){
+		//main solver loop
+		if(solverlock){
+			console.log("already solved!!! import again/another")
+			return
+		}
+		
+		let t=Date.now()
+		if(Options.autonakedsingles && autosinglesdisabledlastturn){ //check for naked singles
+			let cc
+			for(let i=0;i<81;i++){
+				cc=Grid.Cells[Grid.CellList[i]]
+				handleNakedSingle(cc)
+			}
+			refreshGridDisplay()
+		}
+		
+		if(!batchMode){resetHintCanvas()}
+		
+		let stepCounter=0
+		while(checkSolved()==false){
+			if(stepCounter==n){break}
+			let hs=hierarchicalSolver(hintMode) //get (and execute) current easiest step
+			//console.log(hs)
+			if(hs){
+				if(!batchMode){console.log("------------ found step "+stepCounter)
+				console.log(hs)}
+				//handle eliminations here
+				
+				
+				
+				for(let i=0;i<hs.Locations.length;i++){ //these cells have had candidates removed so handle
+					if(!batchMode){console.log("handling "+hs.Locations[i])}
+					let curc=Grid.Cells[hs.Locations[i]]
+					//if(!hintMode){
+						handleNakedSingle(curc,hintMode)
+					//}
+				}
+				//console.log(Grid)
+				stepCounter++
+				
+			}else{
+				if(!batchMode){console.log(":(")
+				console.log(Grid)}
+				if(!batchMode){
+					let solvelogstring = "FAILED SOLVE:\n0: "+solvelog[0].Explanation
+					for(let i=1;i<solvelog.length;i++){
+						solvelogstring+="\n"+i+": ("+sround(solvelog[i].Difficulty,4)+") "+solvelog[i].Explanation
+					}
+					//document.getElementById("solvelog").innerHTML=solvelogstring
+					document.getElementById("solvelog").value=solvelogstring
+				}
+				return false
+			}
+			
+			if(displayboard){ //update candidate display
+				refreshGridDisplay()
+			}
+		}
+		
+		//at this point the steps have either completed or failed
+		
+		solverlock=checkSolved()
+		autosinglesdisabledlastturn = !Options.autonakedsingles
+		
+		let hintObj
+		if(hintMode){
+			hintObj=solvelog.pop()
+		}
+		if(!batchMode){
+			console.log(Date.now()-t)
+			console.log(Grid)
+			console.log(solvelog)
+			let solvelogstring = "0: "+solvelog[0].Explanation
+			for(let i=1;i<solvelog.length;i++){
+				solvelogstring+="\n"+i+": ("+sround(solvelog[i].Difficulty,4)+") "+solvelog[i].Explanation
+			}
+			//document.getElementById("solvelog").innerHTML=solvelogstring
+			document.getElementById("solvelog").value=solvelogstring
+		}
+		
+		if(solverlock=="Error"){
+			console.log("Failed solve")
+			solverlock=true
+			if(!batchMode){
+				document.getElementById("solvelog").value = "FAILED SOLVE:\n"+document.getElementById("solvelog").value
+			}
+			return false
+		}
+		
+		if(hintMode){
+			document.getElementById("solvelog").value+="\n\nHint: ("+sround(hintObj.Difficulty,4)+") "+hintObj.Explanation
+		}
+		if(hintMode||n==1){
+			setTimeout(() => {
+				document.getElementById("solvelog").scrollTop = document.getElementById("solvelog").scrollHeight
+			}, 0)
+		}
+		
+		//grade puzzle
+		let maxdiff=0
+		let totdiff=0
+		for(let i=0;i<solvelog.length;i++){
+			maxdiff=Math.max(maxdiff,solvelog[i].Difficulty)
+			totdiff+=Number(solvelog[i].Difficulty)
+		}
+		maxdiff=Math.round(maxdiff*1000)/1000 //JS
+		totdiff=Math.round(totdiff*1000)/1000 //JS
+		if(!batchMode){
+			let diffstring="Max difficulty: "+maxdiff+"; total difficulty: "+totdiff+"\n\n"
+			//document.getElementById("solvelog").innerHTML = diffstring+document.getElementById("solvelog").innerHTML
+			document.getElementById("solvelog").value = diffstring+document.getElementById("solvelog").value
+		}
+		return [maxdiff,totdiff]
+		
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+</script></html>
