@@ -328,7 +328,7 @@
 		}
 	}
 	
-	let developingmode = true
+	let developingmode = !window.location.href.includes("github.io")
 	if(developingmode){
 		let stylesheet = document.styleSheets[0]
 		for(let rule of stylesheet.cssRules){
