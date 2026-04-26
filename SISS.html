@@ -194,6 +194,7 @@
 				<!--<input type="submit" onclick="solver(0)" value="Show candidates"></input><br><br>-->
 				<input type="submit" onclick="solver(1,true)" value="Hint"></input>
 				<input type="submit" onclick="solver(1)" value="Step"></input>
+				<input type="submit" onclick="solver(729,false,true)" value="Basics"></input>
 				<!--<input type="submit" onclick="solver(100)" value="x100"></input>-->
 				<input type="submit" onclick="solver()" value="Solve"></input><br>
 				<h5>Solve log:</h5>
@@ -301,8 +302,12 @@
 		return JSON.stringify(inp).replace(/[\[\]"]/g,'').replace(/,/g,', ')
 	}
 	
-	let tupleSizes=["0le","single","pair","triple","quad","quintuple","sextuple","septuple","octuple","nonuple","decuple"] 
-	let fishSizes=["0fish","cyclops","X-Wing","Swordfish","Jellyfish","Starfish","Whale","Leviathan","Octopus","Enneafish","Hammerhead"] //both arrays go up to 10
+	function reverse(s){
+	    return s.split("").reverse().join("");
+	}
+	
+	let tupleSizes=["0le", "single", "pair",  "triple",   "quad",     "quintuple","sextuple","septuple", "octuple","nonuple",  "decuple"] 
+	let fishSizes=["0fish","cyclops","X-Wing","Swordfish","Jellyfish","Starfish", "Whale",   "Leviathan","Octopus","Enneafish","Hammerhead"] //both arrays go up to 10
 
 	//the rest
 	
@@ -325,7 +330,9 @@
 		SIS:{ //which strong inference sets are permitted
 			Cell:true,
 			Region:true
-		}
+		},
+		ExtendIfEndpointsMatch:false, //whether to combine A=A SLs where endpoints are the same
+		RingsOnly:false //ignore all non-ring eliminations
 	}
 	
 	let developingmode = !window.location.href.includes("github.io")
@@ -474,7 +481,8 @@
 					PeersHT:cellPeersHT,			//hash table of peers for quickly checking if 2 cells see each other
 					Row:y,							//row of position
 					Column:x,						//col of position
-					Box: curbox						//box of position
+					Box: curbox,					//box of position
+					BoxPosition:Grid.Boxes[curbox-1].length //index position in box, i.e. b1p1
 				}
 			}
 			Grid.Regions = [...Grid.Rows]
@@ -1743,11 +1751,8 @@
 		}
 	}
 	
-	function checkSLForElims(Links,SL){ //SL is index for convenience, peers are generalised to weak inferences
-		let sli=Links.SLs[SL]
-		let pa=Links.Premises[sli.A]
-		let pb=Links.Premises[sli.B]
-		let elims=[]
+	function checkPremisesForElims(Links,pa,pb){ //pa & pb are premise objects
+		let elims = []
 		for(let i=0;i<pa.WLs.length;i++){
 			if(pb.WLHT[pa.WLs[i].Premise]!==undefined){ //mutual weak inference
 				if(pa.WLs[i].Proof!=-1){continue} //not a peer, but instead an AIC-derived weak inference, perhaps this can be enabled as an option
@@ -1758,8 +1763,57 @@
 				elims[elims.length]=pa.WLs[i].Premise
 			}
 		}
+		return elims
+	}
+	
+	function handleRing(Links,elims,SL){ //find all eliminations of a ring
+		let uw = unwrapChain(Links,Links.SLs[SL])
+		//console.log(uw)
+		//console.log(elims)
+		let ca,cb,nE
+		let ringElims={}
+		for(let i=0;i<elims.length;i++){
+			ringElims[elims[i]]=true
+		}
+		for(let a=0;a<uw.UnwrappedChainSL.length;a++){
+			ca = uw.UnwrappedChainSL[a].SL[nodeEnum[uw.UnwrappedChainSL[a].Flip]]
+			for(let b=0;b<uw.UnwrappedChainSL.length;b++){
+				if(a==b){continue}
+				cb = uw.UnwrappedChainSL[b].SL[nodeEnum[1-uw.UnwrappedChainSL[b].Flip]]
+				//console.log(ca,cb)
+				nE = checkPremisesForElims(Links,Links.Premises[ca],Links.Premises[cb])
+				//console.log(nE)
+				for(let n=0;n<nE.length;n++){
+					ringElims[nE[n]]=true
+				}
+			}
+		}
+		//console.log(ringElims)
+		return Object.keys(ringElims)
+	}
+	
+	function checkSLForElims(Links,SL){ //SL is index for convenience, peers are generalised to weak inferences
+		let sli=Links.SLs[SL]
+		let pa=Links.Premises[sli.A]
+		let pb=Links.Premises[sli.B]
+		
+		let elims=checkPremisesForElims(Links,pa,pb)
+		let isring=pa.WLHT[sli.B]
+		
+		//should rings always have elims checked or only if eliminations are already found...? 
+		//as all sub-AIC are necessarily discovered by the chain building process i think it should be safe to skip it... maybe have it configurable for all-steps...
 		if(elims.length>0){
-			return elims
+			if(isring){
+				//console.log("ring!!")
+				//console.log(isring)
+				//console.log(pa.WLs[isring])
+				if(pa.WLs[isring].Proof==-1){ //only check for direct peers again
+					elims = handleRing(Links,elims,SL)
+				}
+			}else{
+				if(Options.RingsOnly){return false}
+			}
+			return {Elims:elims,Ring:(isring!==undefined)}
 		}else{
 			return false
 		}
@@ -1773,6 +1827,9 @@
 		//console.log(Links.SLs.length)
 		for(let i=prevLength;i<Links.SLs.length;i++){ // A=B
 			curSL = Links.SLs[i]
+			if(!Options.ExtendIfEndpointsMatch){
+				if(Links.SLs[i].A==Links.SLs[i].B){continue}
+			}
 			for(let parity=0;parity<=1;parity++){ //whether to extend from A or B
 				curP=Links.Premises[curSL[nodeEnum[parity]]]
 				for(let wl=0;wl<curP.WLs.length;wl++){ //per weakly linked premise; A=B-C
@@ -1847,31 +1904,38 @@
 			for(let j=0;j<newSLs.SLs.length;j++){
 				addStrongLink(Links,newSLs.SLs[j][0],newSLs.SLs[j][1],"AIC",newSLs.SLs[j][2],newSLs.SLs[j][3])
 				cce = checkSLForElims(Links,Links.SLs.length-1)
-				if(cce){return {Elims:cce,SL:Links.SLs.length-1}}
+				if(cce){return {Elims:cce.Elims,Ring:cce.Ring,SL:Links.SLs.length-1}}
 			}
 		}
 		return false
 	}
 	
+	//solver output related functions
 	
 	let weakLinkAlias = {
 		"Row":"r",
 		"Column":"c",
 		"Box":"b",
-		"Cellwise":"n"
+		"Cell":"n"
 	}
 	let linkTypeAlias = {
 		"Row": "R",
 		"Column": "C",
 		"Box": "B",
-		"Cell": "N"
+		"Cell": "N",
+		"ALS": "N", //i just want to pipe ALS/AHS into the namer as bival/biloc respectively and then modify if ALS/AHS are present
+		"AHS Row": "R",
+		"AHS Column": "C",
+		"AHS Box": "B"
 	}
+	//let nodeEnum=["A","B"]  * defined earlier
+	//let flipNode={"A":"B","B":"A"}
 	let nodeFlipEnum={"A":0,"B":1}
 	let nodeFlipLookup=["B","A"]
 	function unwrapChain(Links,chain,flip=0){ //converts a strong link into a full AIC, chain = object not index
 		//console.log(chain)
 		//console.log(flip)
-		let outp={CS:"",Structure:"",Grouped:false,UnwrappedChainSL:[],UnwrappedChainWL:[]}
+		let outp={Structure:"",Grouped:false,ALS:false,AHS:false,XYChain:false,UnwrappedChainSL:[],UnwrappedChainWL:[]}
 		if(chain.Type=="AIC"){
 			//console.log(chain.InnerWL)
 			//console.log(Links.Strong[chain.InnerWL[0]])
@@ -1881,12 +1945,15 @@
 			let ls=unwrapChain(Links, Links.SLs[chain.InnerWL[flip]], nodeFlipEnum[chain.InnerWL[2+flip]])
 			let rs=unwrapChain(Links, Links.SLs[chain.InnerWL[1-flip]], nodeFlipEnum[flipNode[chain.InnerWL[3-flip]]])
 			
-			outp.CS = ls.CS+" - "/*+chain.InnerWL[4]+"- "*/+rs.CS
+			//outp.CS = ls.CS+" - "/*+chain.InnerWL[4]+"- "*/+rs.CS
 			//let wlt=chain.InnerWL[2].match(/[a-z]/)?.[0].toLowerCase()
 			let wlt = weakLinkAlias[chain.InnerWL[4]]
 			//ok, for the weak region classes r = region not row, n = cell, b = box (cage) combinations
 			outp.Structure=ls.Structure+wlt+rs.Structure
 			outp.Grouped=ls.Grouped||rs.Grouped
+			outp.ALS=ls.ALS||rs.ALS
+			outp.AHS=ls.AHS||rs.AHS
+			outp.XYChain=ls.XYChain&&rs.XYChain
 			outp.UnwrappedChainSL = ls.UnwrappedChainSL.concat(rs.UnwrappedChainSL)
 			outp.UnwrappedChainWL = ls.UnwrappedChainWL
 			outp.UnwrappedChainWL[outp.UnwrappedChainWL.length] = chain.InnerWL
@@ -1909,15 +1976,19 @@
 				ct = chain.UnionOrigin.Type
 				if(chain.UnionOrigin.Type=="Grouped"){outp.Grouped=true}
 			}*/
-			outp.CS = ls + "=" + rs
+			//outp.CS = ls + "=" + rs
 			outp.Structure = linkTypeAlias[ct]
-			if(Links.Premises[ls].Candidates.length>1 || Links.Premises[rs].Candidates.length>1){outp.Grouped=true}
+			if(ct=="Row"||ct=="Column"||ct=="Box"){
+				if(Links.Premises[ls].Candidates.length>1 || Links.Premises[rs].Candidates.length>1){outp.Grouped=true}
+			}
+			if(ct=="Cell"){outp.XYChain=true}
+			//do same as above for ALS/AHS whenever i get around to those
 		}
 		return outp
 	}
 	
 	function drawUnwrappedChain(Links,chain){
-		let curSL,curWL
+		let curSL
 		for(let i=0;i<chain.UnwrappedChainSL.length;i++){
 			curSL = chain.UnwrappedChainSL[i]
 			
@@ -1927,7 +1998,6 @@
 			drawLineBetweenNodes(Links,curSL.SL.A,curSL.SL.B,"red")
 		}
 		for(let i=0;i<chain.UnwrappedChainWL.length;i++){
-			curWL = chain.UnwrappedChainWL[i]
 			drawLineBetweenNodes(
 				Links,
 				chain.UnwrappedChainSL[i].SL[nodeEnum[1-chain.UnwrappedChainSL[i].Flip]],
@@ -1936,6 +2006,230 @@
 				"blue"
 			)
 		}
+	}
+	
+	function printGroup(Links,prem){ //prem = tokenised premise name, return grouped location string only
+		//console.log(prem)
+		let curp = Links.Premises[prem]
+		if(curp.Candidates.length==0){
+			return Links.Premises[curp.Candidates[i]].Position
+		}
+		//assume FOR NOW that the group is contained entirely within one region
+		let curc = Grid.Cells[Links.Premises[curp.Candidates[0]].Position]
+		let r = curc.Row
+		let c = curc.Column
+		let b = curc.Box
+		let rp= curc.Column.toString()
+		let cp= curc.Row.toString()
+		let bp= curc.BoxPosition.toString()
+		for(let i=1;i<curp.Candidates.length;i++){
+			curc = Grid.Cells[Links.Premises[curp.Candidates[i]].Position]
+			if(curc.Row!=r){r="Bad"}
+			if(curc.Column!=c){c="Bad"}
+			if(curc.Box!=b){b="Bad"}
+			rp+=curc.Column
+			cp+=curc.Row
+			bp+=curc.BoxPosition
+		}
+		if(r!="Bad"){ //grouped within row
+			return "r"+r+"c"+rp
+		}
+		if(c!="Bad"){
+			return "r"+cp+"c"+c
+		}
+		if(b!="Bad"){
+			return "b"+b+"p"+bp
+		}
+		return prem
+	}
+	
+	function eurekaFromChain(Links,uw){ //unwrapped chain
+		let eu = ""
+		let curd=0
+		let curSL,curA,curB,premA,premB
+		//console.log(uw)
+		for(let i=0;i<uw.UnwrappedChainSL.length;i++){
+			curSL = uw.UnwrappedChainSL[i]
+			curA = curSL.SL[nodeEnum[curSL.Flip]]
+			curB = curSL.SL[nodeEnum[1-curSL.Flip]]
+			premA = Links.Premises[curA]
+			premB = Links.Premises[curB]
+			//notate strong link
+			if(curSL.SL.Type=="Cell"){
+				if(i>0){ //notate weak link
+					eu+=" - "
+				}
+				eu+="("
+				//console.log(premA)
+				for(let j=0;j<premA.Candidates.length;j++){
+					eu+=Links.Premises[premA.Candidates[j]].Digit
+				}
+				eu+="="
+				for(let j=0;j<premB.Candidates.length;j++){
+					eu+=Links.Premises[premB.Candidates[j]].Digit
+				}
+				//console.log(premB)
+				eu+=")"+Links.Premises[premA.Candidates[0]].Position
+			}
+			if(curSL.SL.Type=="Row"||curSL.SL.Type=="Column"||curSL.SL.Type=="Box"){
+				if(curd!=Links.Premises[premA.Candidates[0]].Digit){
+					if(i>0){
+						eu+="("+curd+"-"+Links.Premises[premA.Candidates[0]].Digit+")"
+					}else{
+						eu+="("+Links.Premises[premA.Candidates[0]].Digit+")"
+					}
+				}else{
+					if(i>0){
+						eu+=" - "
+					}
+				}
+				eu+=printGroup(Links,curA)+" = "
+				if(i==uw.UnwrappedChainSL.length-1){ //end of chain
+					eu+="("+Links.Premises[premA.Candidates[0]].Digit+")"
+					eu+=printGroup(Links,curB)
+				}else{
+					if(uw.UnwrappedChainWL[i][4]!="Cell"){ //skip B pos if next WL is cellwise
+						eu+=printGroup(Links,curB)
+					}
+				}
+			}
+			curd = Links.Premises[premB.Candidates[0]].Digit //probably needs special handling for almost/als/ahs aic but this will do for now
+		}
+		return eu
+	}
+	
+	//temp
+	/*
+	let names = {}
+	let sl=["R","C","B","N"]
+	let wl=["r","c","b","n"]
+	function buildAllNames(max,str="",n=1){
+		if(n==1){
+			for(let i=0;i<4;i++){
+				buildAllNames(max,sl[i],2)
+			}
+			return
+		}
+		if(n>max){
+			let possible = [
+				str,
+				str.replace(/[RrCc]/g, c=>"RrCc"[("CcRr".indexOf(c))]), //swap r/c
+				reverse(str)
+			]
+			possible[3] = reverse(possible[1])
+			possible.sort()
+			names[possible[0]]=true
+			return
+		}
+		for(let w=0;w<4;w++){
+			if(str.slice(-1).toLowerCase()==wl[w]){continue}
+			for(let s=0;s<4;s++){
+				if(w==s){continue}
+				buildAllNames(max,str+wl[w]+sl[s],n+1)
+			}
+		}
+	}
+
+	buildAllNames(2)
+	console.log(Object.keys(names).join('":"",\n"'))
+	*/
+	
+	let namedChains = { //rcbn/RCBN weak/strong
+		"R":"Kraken Row",
+		"C":"Kraken Column",
+		"B":"Kraken Box",
+		"N":"Kraken Cell",
+		"L":"Kraken ALS",
+		"H":"Kraken AHS",
+		"CrC":"Skyscraper",
+		"BcR":"Empty Rectangle",
+		"CrN":"Transport",
+		"CbR":"Two-String Kite",
+		"CbN":"Transport",
+		"CnC":"CnC", //just an AHS/HS?
+		"CnR":"XZ", //AHS-XZ
+		"BnC":"XZ", //AHS-XZ
+		"BcB":"Franken Skyscraper", //superseded by claiming candidates
+		"BcN":"Transport",
+		"BnB":"BnB", //just an AHS/HS?
+		"NcN":"XZ", //ALS-XZ
+		"NbN":"XZ",  //ALS-XZ
+		//AIC longer than 2 SL no longer need to be differentiated by region types, so L = local
+		"LlLlL":"Finned Swordfish", //L1-Wing
+		"LlLlN":"H-Wing", //won't appear in regular solver mode because of cannibalistic elimination
+		"LlLnL":"L-Wing",
+		"LlNlL":"S-Wing",
+		"LlNlN":"H-Wing",
+		"LnLlN":"M-Wing",
+		"LnLnL":"L-Wing",
+		"NlLlN":"W-Wing",
+		"NlNlN":"XY-Wing"
+	}
+	
+	let namedRings = {
+		"XY-Chain":"XY-Cycle",
+		"Skyscraper":"X-Wing",
+		"CnC":"Hidden Subset",
+		"BnB":"Hidden Subset",
+		"NcN":"Naked Subset",
+		"NbN":"Naked Subset",
+		"S-Wing":"M-Ring",
+		"M-Wing":"M-Ring",
+		"Finned Swordfish":"Swordfish"
+	}
+	
+	let groupedVariants = {
+		"Skyscraper":"Finned X-Wing", //are there any more moves with unique names when grouped...? maybe crane -> ER? 
+									  //it feels stupid to use this only for finned x-wing when this is the only case that *isn't* entirely accurate (could be sashimi)
+		"Empty Rectangle":"Empty Rectangle" //no "Grouped Empty Rectangle"
+	}
+	
+	function getAICName(Links,uw,isring){
+		//console.log(uw)
+		let name="AIC"
+		let possible = [uw.Structure]
+		if(possible[0].length>3){
+			possible[0] = uw.Structure.replace(/[RCB]/g, "L").replace(/[rcb]/g, "l") //L for local instead
+		}
+		possible[1] = possible[0].replace(/[RrCc]/g, c=>"RrCc"[("CcRr".indexOf(c))]), //swap r/c
+		possible[2] = reverse(possible[0])
+		possible[3] = reverse(possible[1])
+		//console.log(possible)
+		for(let i=0;i<4;i++){
+			if(namedChains[possible[i]]!==undefined){
+				name=namedChains[possible[i]]
+			}
+		}
+		
+		if(uw.XYChain&&name=="AIC"){
+			name = "XY-Chain"
+		}
+		if(isring){
+			if(namedRings[name]!==undefined){
+				name = namedRings[name]
+			}else{
+				name+=" Ring"
+			}
+		}
+		
+		if(uw.Grouped){
+			if(groupedVariants[name]!==undefined){
+				name = groupedVariants[name]
+			}else{
+				name="Grouped "+name
+			}
+		}
+		
+		if(uw.ALS){ //ALS present
+			name="ALS-"+name
+		}
+		
+		if(uw.AHS){ //AHS present
+			name="AHS-"+name
+		}
+		
+		
+		return name
 	}
 	
 	//strong inference set definitions
@@ -1986,6 +2280,8 @@
 		}
 	}
 	
+	//main AIC solver loop
+	
 	let profiling=true
 	
 	function AICSolver(hintMode){
@@ -2019,12 +2315,12 @@
 			//console.log("woaw",bac.SL)
 			//console.log(elimSL)
 			//console.log(cce)
-			let AICString=""
-			if(batchMode){
-				AICString="AIC"
-			}else{
+			let AICString="AIC"
+			let chainName = uw.Structure
+			if(!batchMode){
 				//construct aic string for solver
-				AICString=uw.CS+" => "
+				AICString=eurekaFromChain(Links,uw)+" => "
+				chainName=getAICName(Links,uw,bac.Ring)
 			}
 			let elims = []
 			let elimcells = []
@@ -2046,9 +2342,17 @@
 				//console.log(elimSL)
 				//console.log(uw)
 				drawUnwrappedChain(Links,uw)
+				if(bac.Ring){
+					drawLineBetweenNodes(
+						Links,
+						elimSL.A,
+						elimSL.B,
+						"blue"
+					)
+				}
 			}
 			return {
-				Technique:"AIC", //named chain if applicable
+				Technique:chainName, //named chain if applicable
 				chainString:AICString,
 				chainLength:elimSL.Length,
 				Depth:1, //almost-x depth
@@ -2148,7 +2452,7 @@
 		}
 	}
 	
-	function hierarchicalSolver(hintMode){
+	function hierarchicalSolver(hintMode,basicsOnly){
 		if(Options.Basics){
 			let basics = basicsSolver(hintMode)
 			//console.log(basics)
@@ -2158,6 +2462,7 @@
 				return basics
 			}
 		}
+		if(basicsOnly){return}
 		if(Options.AIC){
 			let aict
 			if(!batchMode){console.log("=== AIC started ===")
@@ -2178,7 +2483,7 @@
 	let solverlock = false
 	let autosinglesdisabledlastturn = false
 	
-	function solver(n=729,hintMode=false){
+	function solver(n=729,hintMode=false,basicsOnly=false){
 		//main solver loop
 		if(solverlock){
 			console.log("already solved!!! import again/another")
@@ -2200,7 +2505,7 @@
 		let stepCounter=0
 		while(checkSolved()==false){
 			if(stepCounter==n){break}
-			let hs=hierarchicalSolver(hintMode) //get (and execute) current easiest step
+			let hs=hierarchicalSolver(hintMode,basicsOnly) //get (and execute) current easiest step
 			//console.log(hs)
 			if(hs){
 				if(!batchMode){console.log("------------ found step "+stepCounter)
@@ -2220,17 +2525,21 @@
 				stepCounter++
 				
 			}else{
-				if(!batchMode){console.log(":(")
-				console.log(Grid)}
-				if(!batchMode){
-					let solvelogstring = "FAILED SOLVE:\n0: "+solvelog[0].Explanation
-					for(let i=1;i<solvelog.length;i++){
-						solvelogstring+="\n"+i+": ("+sround(solvelog[i].Difficulty,4)+") "+solvelog[i].Explanation
+				if(basicsOnly){
+					stepCounter=n
+				}else{
+					if(!batchMode){console.log(":(")
+					console.log(Grid)}
+					if(!batchMode){
+						let solvelogstring = "FAILED SOLVE:\n0: "+solvelog[0].Explanation
+						for(let i=1;i<solvelog.length;i++){
+							solvelogstring+="\n"+i+": ("+sround(solvelog[i].Difficulty,4)+") "+solvelog[i].Explanation
+						}
+						//document.getElementById("solvelog").innerHTML=solvelogstring
+						document.getElementById("solvelog").value=solvelogstring
 					}
-					//document.getElementById("solvelog").innerHTML=solvelogstring
-					document.getElementById("solvelog").value=solvelogstring
+					return false
 				}
-				return false
 			}
 			
 			if(displayboard){ //update candidate display

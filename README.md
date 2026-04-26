@@ -24,6 +24,8 @@ Here you can paste in an 81-character puzzle string. Givens are listed in top-do
 
 "Step" will find and execute the easiest technique currently available in the puzzle, according to the hierarchical solver.
 
+"Basics" will find and execute every move before AIC is required.
+
 "Solve" will keep stepping until the puzzle is finally solved.
 
 Solve log:
@@ -82,14 +84,19 @@ Even with all the exotic strong inference sets piled on to the solver, this is s
 Solver:<br>
 - Almost-AIC through A-B=C-D<br>
 - ALS, AHS, Kraken Fish, AP Guardians, etc...<br>
-- Better-formatted Eureka strings with all short AIC named properly<br>
-- Some options to speed up batch mode (like applying all AIC eliminations at once etc.)<br>
-- Rings
+- Some options to speed up batch mode (like applying all AIC eliminations at once etc.), maybe even some that accept a weaker categorisation for more speed.<br>
+- Show all steps & solvepath building
 
 Site:<br>
 - Settings page with toggles for strategies and SIS types
 
 ## Changelog
+
+### v0.1 - 
+
+Implemented Rings<br>
+Implemented AIC names and Eureka notation<br>
+Added button to skip basics
 
 ### v0 - 2026-04-23
 
